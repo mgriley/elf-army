@@ -96,7 +96,7 @@ export class PeerManager {
     name: string,
     create: (callbacks: PeerManagerHandle) => AbstractPeer,
   ): Promise<void> {
-    assertValidName(name);
+    assertValidPeerName(name);
     const callbacks: PeerManagerHandle = {
       invokeFunction: (funcName, inData) => this.handleInbound(name, funcName, inData),
     };
@@ -240,7 +240,12 @@ function toView(entry: PeerEntry): PeerView {
   };
 }
 
-function assertValidName(name: string): void {
+/**
+ * Throw unless `name` is a safe, portable peer name. Exported so callers that
+ * derive filesystem paths or fork processes from a name (e.g. SpawnManager) can
+ * reject it before acting, rather than discovering the problem at attachPeer.
+ */
+export function assertValidPeerName(name: string): void {
   if (!VALID_NAME.test(name)) {
     throw new Error(`invalid peer name "${name}": must match ${VALID_NAME}`);
   }

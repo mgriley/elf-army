@@ -20,7 +20,7 @@ import path from "node:path";
 
 import { checkIfDirExists, findAllSubdirs } from "../utils/utils.js";
 import { IpcPeer } from "./ipc_peer.js";
-import type { PeerManager } from "./peer_manager.js";
+import { assertValidPeerName, type PeerManager } from "./peer_manager.js";
 
 export interface SpawnManagerOptions {
   /** Directory holding one subdir per child elf (its workspace). */
@@ -65,6 +65,10 @@ export class SpawnManager {
    * peer name. Throws if a child with this name is already running.
    */
   async spawnActor(name: string, purpose: string): Promise<void> {
+    // Reject bad names before they reach the filesystem: `name` becomes a
+    // directory under childrenDir, so an invalid one risks path traversal. Uses
+    // PeerManager's rule (where it's re-checked at attachPeer) to avoid drift.
+    assertValidPeerName(name);
     if (this.children.has(name)) {
       throw new Error(`spawnActor: child "${name}" is already running`);
     }
