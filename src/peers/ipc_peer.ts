@@ -3,11 +3,12 @@
  * `process` itself for talking to our parent. This is the only transport for
  * V1, since the elf hierarchy is a process tree wired together by `fork()`.
  *
- * It owns request/response correlation for a single edge: each outgoing call
- * gets a unique id, the matching reply resolves its promise, and inbound calls
- * are dispatched to `managerHandle.invokeFunction` with the result shipped back. (This
- * supersedes the old standalone `messenger.ts`, which multiplexed every peer
- * through one handler; here each edge is its own self-contained `IpcPeer`.)
+ * Request/response correlation for this single edge is delegated to an
+ * {@link AsyncRequestTracker}: each outgoing call gets a unique id, the matching
+ * reply resolves its promise, and inbound calls are dispatched to
+ * `managerHandle.invokeFunction` with the result shipped back. (This supersedes
+ * the old standalone `messenger.ts`, which multiplexed every peer through one
+ * handler; here each edge is its own self-contained `IpcPeer`.)
  *
  * Wire shapes, discriminated by `__peer` and validated on receipt:
  *   request:  { __peer: "request",  id, funcName, inData }
@@ -16,78 +17,100 @@
 
 import type { ChildProcess } from "node:child_process";
 
+import { AsyncRequestTracker } from "../utils/async-request-tracker.js";
 import { Schema } from "../utils/schema.js";
+import {
+  schemaLiteral,
+  schemaNum,
+  schemaObj,
+  schemaResult,
+  schemaStr,
+} from "../utils/schema_utils.js";
 import { AbstractPeer, type CallResult, type PeerManagerHandle } from "./peer.js";
 
 /** Either end of a Node IPC channel exposes this slice of the API. */
 export type IpcChannel = Pick<ChildProcess, "send" | "on" | "off">;
 
+/** What we hand the tracker per outgoing call; it stamps on the correlation id. */
+interface RequestPayload {
+  funcName: string;
+  inData: string;
+}
+
 interface RequestMessage {
   __peer: "request";
-  id: string;
+  id: number;
   funcName: string;
   inData: string;
 }
 
 interface ResponseMessage {
   __peer: "response";
-  id: string;
+  id: number;
   result: CallResult;
 }
 
-// Inbound requests come from another process, so validate their flat string
-// fields before use. Responses carry a `CallResult` union (not expressible in
-// our mini-schema) and are checked structurally in `isResponse` instead.
-const requestSchema = new Schema<RequestMessage>({
-  type: "object",
-  properties: {
-    __peer: { type: "string" },
-    id: { type: "string" },
-    funcName: { type: "string" },
-    inData: { type: "string" },
-  },
-});
+// Messages arrive from another process, so validate them before use. The
+// `result` arm is a `CallResult` (Result<string>), built via schemaResult.
+const requestSchema = new Schema<RequestMessage>(
+  schemaObj({
+    __peer: schemaLiteral("request"),
+    id: schemaNum(),
+    funcName: schemaStr(),
+    inData: schemaStr(),
+  }),
+);
+
+const responseSchema = new Schema<ResponseMessage>(
+  schemaObj({
+    __peer: schemaLiteral("response"),
+    id: schemaNum(),
+    result: schemaResult(schemaStr()),
+  }),
+);
 
 export class IpcPeer extends AbstractPeer {
-  private nextId = 0;
-  private readonly pending = new Map<string, (result: CallResult) => void>();
   private closed = false;
   private readonly listener: (msg: unknown) => void;
+  // Correlates each outgoing call to the peer's reply by id; see AsyncRequestTracker.
+  private readonly tracker = new AsyncRequestTracker<RequestPayload, CallResult>(
+    (id, payload) => {
+      const request: RequestMessage = { __peer: "request", id, ...payload };
+      // `send` returns false (or is absent) when there is no live IPC channel —
+      // e.g. the peer process already exited. Degrade to an error result.
+      const sent = this.channel.send?.(request);
+      if (sent === false || sent === undefined) {
+        this.tracker.resolve(id, { ok: false, error: "peer has no IPC channel" });
+      }
+    },
+    { label: "peer call" },
+  );
 
   constructor(
     private readonly channel: IpcChannel,
-    callbacks: PeerManagerHandle,
+    managerHandle: PeerManagerHandle,
   ) {
-    super(callbacks);
+    super(managerHandle);
     this.listener = (msg) => void this.handleIncoming(msg);
     this.channel.on("message", this.listener);
   }
 
   async sendRpc(funcName: string, inData: string): Promise<CallResult> {
     if (this.closed) return { ok: false, error: "peer connection is closed" };
-
-    const id = `call-${++this.nextId}`;
-    return new Promise<CallResult>((resolve) => {
-      this.pending.set(id, resolve);
-      const request: RequestMessage = { __peer: "request", id, funcName, inData };
-      // `send` returns false (or is absent) when there is no live IPC channel —
-      // e.g. the peer process already exited. Degrade to an error result.
-      const sent = this.channel.send?.(request);
-      if (sent === false || sent === undefined) {
-        this.pending.delete(id);
-        resolve({ ok: false, error: "peer has no IPC channel" });
-      }
-    });
+    try {
+      return await this.tracker.request({ funcName, inData });
+    } catch (err) {
+      // The tracker rejects only when the transport dies (see close()); surface
+      // it as a value to keep the "never throws" contract.
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
   }
 
   close(): void {
     if (this.closed) return;
     this.closed = true;
     this.channel.off("message", this.listener);
-    for (const resolve of this.pending.values()) {
-      resolve({ ok: false, error: "peer connection closed before reply" });
-    }
-    this.pending.clear();
+    this.tracker.rejectAll(new Error("peer connection closed before reply"));
   }
 
   private async handleIncoming(msg: unknown): Promise<void> {
@@ -97,16 +120,16 @@ export class IpcPeer extends AbstractPeer {
         : undefined;
 
     if (kind === "response") {
-      if (!isResponse(msg)) return;
-      const resolve = this.pending.get(msg.id);
-      if (!resolve) return; // unknown/duplicate id — ignore
-      this.pending.delete(msg.id);
-      resolve(msg.result);
+      // resolve is a no-op for unknown/duplicate ids, so no extra guard needed.
+      const parsed = responseSchema.safeParse(msg);
+      // TODO - should potentially notifythe PeerManager of malformed messages, but for now just ignore them.
+      if (parsed.ok) this.tracker.resolve(parsed.value.id, parsed.value.result);
       return;
     }
 
     if (kind !== "request") return;
     const parsed = requestSchema.safeParse(msg);
+      // TODO - should potentially notifythe PeerManager of malformed messages, but for now just ignore them.
     if (!parsed.ok) return;
     const { id, funcName, inData } = parsed.value;
 
@@ -114,17 +137,4 @@ export class IpcPeer extends AbstractPeer {
     const reply: ResponseMessage = { __peer: "response", id, result };
     this.channel.send?.(reply);
   }
-}
-
-/** Structural guard for a response envelope (its `result` is a union type). */
-function isResponse(msg: unknown): msg is ResponseMessage {
-  if (typeof msg !== "object" || msg === null) return false;
-  const m = msg as Record<string, unknown>;
-  if (m.__peer !== "response" || typeof m.id !== "string") return false;
-  const r = m.result;
-  if (typeof r !== "object" || r === null) return false;
-  const res = r as Record<string, unknown>;
-  if (res.ok === true) return typeof res.value === "string";
-  if (res.ok === false) return typeof res.error === "string";
-  return false;
 }

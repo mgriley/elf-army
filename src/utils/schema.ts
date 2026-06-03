@@ -9,10 +9,16 @@
  *
  * Supported keywords (intentionally small — extend only when needed):
  *   - type: object | array | string | number | integer | boolean | optional
+ *     | literal | union
  *   - object:   properties (all required)
  *   - array:    items
  *   - optional: inner — value satisfies the inner schema, or is null (the only
  *     place null is accepted)
+ *   - literal:  value — strictly equals a fixed string/number/boolean. Pairs
+ *     with union to discriminate arms (e.g. `ok: true` vs `ok: false`).
+ *   - union:    anyOf — value satisfies at least one of the listed schemas;
+ *     variants are tried in order and the first match wins. With a literal
+ *     discriminator this expresses `Result<T>` (see utils.ts).
  */
 
 interface BaseSchema {
@@ -49,13 +55,27 @@ export interface OptionalSchema extends BaseSchema {
   inner: JsonSchema;
 }
 
+/** Matches one fixed primitive value, by strict equality. */
+export interface LiteralSchema extends BaseSchema {
+  type: "literal";
+  value: string | number | boolean;
+}
+
+/** Value must satisfy at least one of `anyOf`; variants are tried in order. */
+export interface UnionSchema extends BaseSchema {
+  type: "union";
+  anyOf: JsonSchema[];
+}
+
 export type JsonSchema =
   | StringSchema
   | NumberSchema
   | BooleanSchema
   | ArraySchema
   | ObjectSchema
-  | OptionalSchema;
+  | OptionalSchema
+  | LiteralSchema
+  | UnionSchema;
 
 /** Thrown on the first validation failure, carrying the path to the bad value. */
 export class SchemaError extends Error {
@@ -81,6 +101,13 @@ export function validate(
   switch (schema.type) {
     case "optional":
       return value === null ? null : validate(schema.inner, value, path);
+    case "literal":
+      if (value !== schema.value) {
+        throw new SchemaError(path, `expected ${JSON.stringify(schema.value)}`);
+      }
+      return value;
+    case "union":
+      return validateUnion(schema, value, path);
     case "object":
       return validateObject(schema, value, path);
     case "array":
@@ -95,6 +122,23 @@ export function validate(
       if (typeof value !== "boolean") throw new SchemaError(path, "expected boolean");
       return value;
   }
+}
+
+function validateUnion(schema: UnionSchema, value: unknown, path: string): unknown {
+  const failures: string[] = [];
+  for (const variant of schema.anyOf) {
+    try {
+      return validate(variant, value, path);
+    } catch (err) {
+      // Strict, no-coercion variants: a failure just means "not this arm". Keep
+      // the detail so the aggregate error can explain why nothing matched.
+      failures.push(err instanceof SchemaError ? err.message : String(err));
+    }
+  }
+  throw new SchemaError(
+    path,
+    `no union variant matched (${failures.join("; ")})`,
+  );
 }
 
 function validateNumber(schema: NumberSchema, value: unknown, path: string): number {

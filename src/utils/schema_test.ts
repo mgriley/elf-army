@@ -157,6 +157,101 @@ describe("validate — optional", () => {
   });
 });
 
+describe("validate — union", () => {
+  const schema: JsonSchema = {
+    type: "union",
+    anyOf: [{ type: "string" }, { type: "number" }],
+  };
+
+  it("accepts a value matching any variant", () => {
+    assert.equal(validate(schema, "hi"), "hi");
+    assert.equal(validate(schema, 42), 42);
+  });
+
+  it("rejects a value matching no variant, listing why", () => {
+    assert.throws(
+      () => validate(schema, true),
+      (err: unknown) =>
+        err instanceof SchemaError &&
+        err.path === "$" &&
+        /no union variant matched/.test(err.message) &&
+        /expected string/.test(err.message) &&
+        /expected number/.test(err.message),
+    );
+  });
+
+  it("returns the first matching variant's normalized value", () => {
+    // The object arm drops undeclared keys; the first arm (string) can't match
+    // an object, so the second arm runs and strips `extra`.
+    const objOrStr: JsonSchema = {
+      type: "union",
+      anyOf: [
+        { type: "string" },
+        { type: "object", properties: { n: { type: "number" } } },
+      ],
+    };
+    assert.deepEqual(validate(objOrStr, { n: 1, extra: true }), { n: 1 });
+  });
+
+  it("expresses a discriminated Result union", () => {
+    // Result<string>: { ok: true, value } | { ok: false, error }. A literal on
+    // `ok` discriminates the arms, so a mismatched-payload shape is rejected.
+    const result = new Schema<
+      { ok: true; value: string } | { ok: false; error: string }
+    >({
+      type: "union",
+      anyOf: [
+        {
+          type: "object",
+          properties: {
+            ok: { type: "literal", value: true },
+            value: { type: "string" },
+          },
+        },
+        {
+          type: "object",
+          properties: {
+            ok: { type: "literal", value: false },
+            error: { type: "string" },
+          },
+        },
+      ],
+    });
+
+    assert.deepEqual(result.parse({ ok: true, value: "yes" }), {
+      ok: true,
+      value: "yes",
+    });
+    assert.deepEqual(result.parse({ ok: false, error: "boom" }), {
+      ok: false,
+      error: "boom",
+    });
+    assert.equal(result.isValid({ ok: true }), false); // success arm needs value
+    // Discriminator pins each arm: ok:false can't borrow the success payload.
+    assert.equal(result.isValid({ ok: false, value: "x" }), false);
+    assert.equal(result.isValid({ ok: true, error: "x" }), false);
+  });
+});
+
+describe("validate — literal", () => {
+  it("matches a fixed value by strict equality", () => {
+    assert.equal(validate({ type: "literal", value: "go" }, "go"), "go");
+    assert.equal(validate({ type: "literal", value: 7 }, 7), 7);
+    assert.equal(validate({ type: "literal", value: true }, true), true);
+  });
+
+  it("rejects anything else, including loose-equal values", () => {
+    assert.throws(
+      () => validate({ type: "literal", value: true }, 1),
+      SchemaError,
+    );
+    assert.throws(
+      () => validate({ type: "literal", value: "go" }, "GO"),
+      SchemaError,
+    );
+  });
+});
+
 describe("SchemaError", () => {
   it("carries the path and formats the message", () => {
     const err = new SchemaError("$.foo", "expected string");
