@@ -4,15 +4,23 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
 import { HttpPeer } from "./http_peer.js";
-import type { CallResult, PeerManagerHandle } from "./peer.js";
+import type { CallResult, PeerManagerHandle } from "../peers/peer.js";
 
 /** A managerHandle whose response is swapped per test; records inbound calls. */
 class FakeHandle implements PeerManagerHandle {
   readonly calls: { funcName: string; inData: string }[] = [];
   next: CallResult = { ok: true, value: "{}" };
+  /** Returned by describeInterface (GET /); swappable per test. */
+  description: CallResult = {
+    ok: true,
+    value: '{"name":"api","funcs":[{"name":"ping","inputSchema":{},"outputSchema":{}}]}',
+  };
   async invokeFunction(funcName: string, inData: string): Promise<CallResult> {
     this.calls.push({ funcName, inData });
     return this.next;
+  }
+  async describeInterface(): Promise<CallResult> {
+    return this.description;
   }
 }
 
@@ -34,11 +42,22 @@ describe("HttpPeer", () => {
     peer.close();
   });
 
-  it("serves a health check on GET /", async () => {
+  it("advertises the assigned interface on GET /", async () => {
     const res = await fetch(`${base}/`);
     assert.equal(res.status, 200);
-    assert.equal(await res.text(), "ok");
-    assert.equal(handle.calls.length, 0); // never reaches the function gate
+    assert.equal(res.headers.get("content-type"), "application/json");
+    assert.deepEqual(await res.json(), {
+      name: "api",
+      funcs: [{ name: "ping", inputSchema: {}, outputSchema: {} }],
+    });
+    assert.equal(handle.calls.length, 0); // discovery never reaches the function gate
+  });
+
+  it("maps a describeInterface error on GET / onto an HTTP status", async () => {
+    handle.description = { ok: false, error: 'interface "api" no longer exists' };
+    const res = await fetch(`${base}/`);
+    assert.equal(res.status, 404);
+    assert.equal(await res.text(), 'interface "api" no longer exists');
   });
 
   it("forwards POST /<funcName> to invokeFunction and returns the value", async () => {

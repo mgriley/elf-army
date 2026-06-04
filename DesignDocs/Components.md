@@ -167,18 +167,22 @@ Request mapping (V1, deliberately minimal):
   - `POST /<funcName>`, request body is `inData` (JSON text)
   - 200 + output JSON text          on  { ok: true }
   - 4xx/5xx + error string in body  on  { ok: false }  (e.g. 404 unknown/denied, 500 runtime)
-  - `GET /`  ->  health check / optional list of callable funcs in the assigned interface
+  - `GET /`  ->  the assigned interface as JSON (each func's name + input/output schemas), so a
+    client can discover its full callable surface before POSTing. `{"name":null,"funcs":[]}` when
+    nothing is exposed. Always 200 on a live edge, so it doubles as a health/liveness probe.
 
 All anonymous clients of a port share a single peer identity — "the public edge for port N".
 Access is scoped per-port: open one port bound to interface `publicApi`, another bound to
 `adminApi`. The interface assigned to that peer IS the public API surface; nothing outside it
 is reachable. To expose more or less, change the peer's interface (PeerManager), not the port.
 
-Implemented in `src/peers/ports_manager.ts` (lifecycle + persistence) and `src/peers/http_peer.ts`
+Implemented in `src/ports/ports_manager.ts` (lifecycle + persistence) and `src/ports/http_peer.ts`
 (the transport). PortsManager binds the socket *before* attaching the peer, so a bind failure
 (e.g. port in use) throws without leaving a phantom peer; `port: 0` binds an ephemeral port and
 the resolved value is what gets persisted. HttpPeer maps `POST /<funcName>` (body = inData) to
-`invokeFunction`, `GET /` to a health check, and CallResult errors onto HTTP statuses
+`invokeFunction`, `GET /` to an interface description (via `PeerManagerHandle.describeInterface`,
+which reuses the peer's assigned binding so discovery can never advertise more than the call gate
+permits), and CallResult errors onto HTTP statuses
 (403 no interface / 404 unknown func / 400 bad input / 500 runtime), with a 1 MiB body cap.
 
 ### API

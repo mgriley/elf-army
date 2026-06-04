@@ -25,6 +25,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Result } from "../utils/utils.js";
+import type { InterfaceDescription } from "../functions/function_manager.js";
 import { AbstractPeer, type CallResult, type PeerManagerHandle } from "./peer.js";
 
 /**
@@ -36,6 +37,8 @@ import { AbstractPeer, type CallResult, type PeerManagerHandle } from "./peer.js
 export interface FunctionGateway {
   /** Member function names of an interface, or undefined if it doesn't exist. */
   getInterface(name: string): { funcs: string[] } | undefined;
+  /** The peer-facing description of an interface (names + schemas). */
+  describeInterface(name: string): InterfaceDescription;
   /** Execute a function by name with JSON input text; never throws. */
   executeFunc(funcName: string, inData: string): Promise<Result<string>>;
 }
@@ -99,6 +102,7 @@ export class PeerManager {
     assertValidPeerName(name);
     const callbacks: PeerManagerHandle = {
       invokeFunction: (funcName, inData) => this.handleInbound(name, funcName, inData),
+      describeInterface: () => this.describeInbound(name),
     };
     const connection = create(callbacks);
 
@@ -202,6 +206,30 @@ export class PeerManager {
       };
     }
     return this.gateway.executeFunc(funcName, inData);
+  }
+
+  /**
+   * Describe the callable surface currently exposed to `name`, for inbound
+   * discovery (e.g. an HTTP client asking "what may I call?"). Reuses the same
+   * binding the access gate enforces, so the answer can never advertise more
+   * than {@link handleInbound} would permit. A peer with no interface assigned
+   * gets an empty (but well-formed) description rather than an error — nothing
+   * exposed yet is a valid answer, not a failure.
+   */
+  private async describeInbound(name: string): Promise<CallResult> {
+    const entry = this.peers.get(name);
+    if (!entry) return { ok: false, error: `no peer named "${name}"` };
+
+    const ifaceName = entry.interfaceName;
+    if (!ifaceName) {
+      return { ok: true, value: JSON.stringify({ name: null, funcs: [] }) };
+    }
+    // Guard existence here (same as handleInbound) so describeInterface, which
+    // throws on an unknown interface, is only called once we know it resolves.
+    if (!this.gateway.getInterface(ifaceName)) {
+      return { ok: false, error: `interface "${ifaceName}" no longer exists` };
+    }
+    return { ok: true, value: JSON.stringify(this.gateway.describeInterface(ifaceName)) };
   }
 
   private requirePeer(name: string): PeerEntry {

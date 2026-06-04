@@ -1,7 +1,8 @@
 /**
- * PortsManager — the listening ports this elf serves on.
+ * PortsManager — handles opening HTTP listening ports so that the Elf can expose
+ * its own HTTP server. Does so by registing `HttpPeer`s with the PeerManager.
  *
- * It is to sockets what {@link import("./spawn_manager.js").SpawnManager} is to
+ * It is to sockets what {@link import("../spawn/spawn_manager.js").SpawnManager} is to
  * child processes: it owns the *existence* side (open a port, close one, reopen
  * the set on startup) and hands each live listener to {@link PeerManager} as an
  * {@link HttpPeer}. Like SpawnManager, it knows nothing about interfaces — the
@@ -23,7 +24,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { HttpPeer } from "./http_peer.js";
-import { assertValidPeerName, type PeerManager } from "./peer_manager.js";
+import { assertValidPeerName, type PeerManager } from "../peers/peer_manager.js";
 
 /** Where to bind a port. `host` defaults to loopback (see {@link DEFAULT_HOST}). */
 export interface OpenPortOptions {

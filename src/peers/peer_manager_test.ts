@@ -11,6 +11,13 @@ import { AbstractPeer, type CallResult, type PeerManagerHandle } from "./peer.js
 // echoes its input so tests can assert the call reached through.
 const gateway: FunctionGateway = {
   getInterface: (name) => (name === "api" ? { funcs: ["ping"] } : undefined),
+  describeInterface: (name) => {
+    if (name !== "api") throw new Error(`no interface named "${name}"`);
+    return {
+      name,
+      funcs: [{ name: "ping", inputSchema: { type: "string" }, outputSchema: { type: "string" } }],
+    };
+  },
   executeFunc: async (funcName, inData) => ({
     ok: true,
     value: `ran:${funcName}(${inData})`,
@@ -33,6 +40,9 @@ class TestPeer extends AbstractPeer {
   }
   receive(funcName: string, inData: string): Promise<CallResult> {
     return this.managerHandle.invokeFunction(funcName, inData);
+  }
+  describe(): Promise<CallResult> {
+    return this.managerHandle.describeInterface();
   }
   close(): void {
     this.closed = true;
@@ -117,6 +127,34 @@ describe("PeerManager", () => {
       const peer = await attachTestPeer(pm, "child");
       await pm.setPeerInterface("child", "gone");
       const res = await peer.receive("ping", "42");
+      assert.equal(res.ok, false);
+      assert.match(res.ok ? "" : res.error, /no longer exists/);
+    });
+  });
+
+  describe("interface discovery (inbound)", () => {
+    it("describes the assigned interface with names and schemas", async () => {
+      const peer = await attachTestPeer(pm, "child");
+      await pm.setPeerInterface("child", "api");
+      const res = await peer.describe();
+      assert.equal(res.ok, true);
+      assert.deepEqual(JSON.parse(res.ok ? res.value : "null"), {
+        name: "api",
+        funcs: [{ name: "ping", inputSchema: { type: "string" }, outputSchema: { type: "string" } }],
+      });
+    });
+
+    it("describes an empty surface when no interface is assigned", async () => {
+      const peer = await attachTestPeer(pm, "child");
+      const res = await peer.describe();
+      assert.equal(res.ok, true);
+      assert.deepEqual(JSON.parse(res.ok ? res.value : "null"), { name: null, funcs: [] });
+    });
+
+    it("errors when the assigned interface no longer exists", async () => {
+      const peer = await attachTestPeer(pm, "child");
+      await pm.setPeerInterface("child", "gone");
+      const res = await peer.describe();
       assert.equal(res.ok, false);
       assert.match(res.ok ? "" : res.error, /no longer exists/);
     });

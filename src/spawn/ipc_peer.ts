@@ -26,7 +26,7 @@ import {
   schemaResult,
   schemaStr,
 } from "../utils/schema_utils.js";
-import { AbstractPeer, type CallResult, type PeerManagerHandle } from "./peer.js";
+import { AbstractPeer, type CallResult, type PeerManagerHandle } from "../peers/peer.js";
 
 /** Either end of a Node IPC channel exposes this slice of the API. */
 export type IpcChannel = Pick<ChildProcess, "send" | "on" | "off">;

@@ -1,5 +1,6 @@
 /**
- * SpawnManager — the lifecycle of this elf's child processes.
+ * SpawnManager — spawns child elves as child processes and registers them
+ * as peers with the PeerManager.
  *
  * In V1 the only peers are processes in our own tree: we talk to children we
  * fork (and, separately, to the parent that forked us). SpawnManager owns the
@@ -20,7 +21,7 @@ import path from "node:path";
 
 import { checkIfDirExists, findAllSubdirs } from "../utils/utils.js";
 import { IpcPeer } from "./ipc_peer.js";
-import { assertValidPeerName, type PeerManager } from "./peer_manager.js";
+import { assertValidPeerName, type PeerManager } from "../peers/peer_manager.js";
 
 export interface SpawnManagerOptions {
   /** Directory holding one subdir per child elf (its workspace). */

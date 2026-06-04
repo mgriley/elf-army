@@ -1,7 +1,7 @@
 /**
  * An {@link AbstractPeer} over Node's built-in `http.Server` (zero deps) — the
  * edge that lets an elf act like a server. It is the HTTP counterpart to
- * {@link import("./ipc_peer.js").IpcPeer}: where IpcPeer wraps a duplex IPC
+ * {@link import("../spawn/ipc_peer.js").IpcPeer}: where IpcPeer wraps a duplex IPC
  * channel to one process, HttpPeer wraps a listening socket whose many anonymous
  * clients all share this single peer identity ("the public edge for port N").
  *
@@ -19,7 +19,11 @@
  *   POST /<funcName>   body = inData (JSON text)
  *     { ok: true }  -> 200 + output JSON text
  *     { ok: false } -> 4xx/5xx + error string   (see {@link statusForError})
- *   GET  /             -> 200 health check ("ok")
+ *   GET  /             -> 200 + the assigned interface as JSON (names + schemas),
+ *                         letting a client discover its full callable surface up
+ *                         front. A peer with nothing exposed gets
+ *                         `{"name":null,"funcs":[]}`. Doubles as a health/liveness
+ *                         probe: a live edge always answers 200 here.
  *   anything else      -> 405 / 404
  *
  * Because HTTP is natively request/response, there is no id-correlation tracker
@@ -29,7 +33,7 @@
 
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 
-import { AbstractPeer, type CallResult, type PeerManagerHandle } from "./peer.js";
+import { AbstractPeer, type CallResult, type PeerManagerHandle } from "../peers/peer.js";
 
 /** Cap on request body size, so a single client can't exhaust memory. */
 const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB
@@ -73,9 +77,15 @@ export class HttpPeer extends AbstractPeer {
     // `req.url` is a path+query like "/ping?x=1"; we only key off the path.
     const path = decodeURIComponent((req.url ?? "/").split("?", 1)[0]);
 
-    // Health check / liveness probe.
+    // Interface discovery, doubling as a health/liveness probe: advertise the
+    // peer's full callable surface (names + schemas) so a client knows what it
+    // may POST. The description is the same binding the call gate enforces.
     if (method === "GET" && path === "/") {
-      return respond(res, 200, "ok");
+      const result = await this.managerHandle.describeInterface();
+      if (result.ok) {
+        return respond(res, 200, result.value, "application/json");
+      }
+      return respond(res, statusForError(result.error), result.error);
     }
     if (method !== "POST") {
       return respond(res, 405, `method ${method} not allowed; use POST /<funcName>`);

@@ -5,12 +5,19 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { PortsManager } from "./ports_manager.js";
-import { PeerManager, type FunctionGateway } from "./peer_manager.js";
+import { PeerManager, type FunctionGateway } from "../peers/peer_manager.js";
 
 // Same shape as peer_manager_test: one interface "api" exposing "ping", which
 // echoes its input so we can confirm a request reached all the way through.
 const gateway: FunctionGateway = {
   getInterface: (name) => (name === "api" ? { funcs: ["ping"] } : undefined),
+  describeInterface: (name) => {
+    if (name !== "api") throw new Error(`no interface named "${name}"`);
+    return {
+      name,
+      funcs: [{ name: "ping", inputSchema: { type: "string" }, outputSchema: { type: "string" } }],
+    };
+  },
   executeFunc: async (funcName, inData) => ({
     ok: true,
     value: `ran:${funcName}(${inData})`,
@@ -66,6 +73,26 @@ describe("PortsManager", () => {
     const [status, body] = await call(ports, "public", "ping", "42");
     assert.equal(status, 200);
     assert.equal(body, "ran:ping(42)");
+  });
+
+  it("advertises the assigned interface over GET /", async () => {
+    await ports.openPort("public", { port: 0 });
+    await peers.setPeerInterface("public", "api");
+
+    const res = await fetch(`http://127.0.0.1:${ports.getPort("public")}/`);
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), {
+      name: "api",
+      funcs: [{ name: "ping", inputSchema: { type: "string" }, outputSchema: { type: "string" } }],
+    });
+  });
+
+  it("reports an empty surface over GET / when no interface is assigned", async () => {
+    await ports.openPort("public", { port: 0 });
+
+    const res = await fetch(`http://127.0.0.1:${ports.getPort("public")}/`);
+    assert.equal(res.status, 200); // still a valid liveness response
+    assert.deepEqual(await res.json(), { name: null, funcs: [] });
   });
 
   it("denies a function outside the assigned interface", async () => {

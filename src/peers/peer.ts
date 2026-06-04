@@ -33,6 +33,15 @@ export type CallResult = Result<string>;
 export interface PeerManagerHandle {
   /** The peer is calling `funcName` on us with `inData` (JSON text). */
   invokeFunction(funcName: string, inData: string): Promise<CallResult>;
+
+  /**
+   * The peer is asking us to describe its callable surface: the full interface
+   * currently assigned to it, returned as JSON text (each function's name and
+   * input/output schemas). Lets a client discover what it may call without a
+   * prior list. `ok: true` with an empty-`funcs` description means the peer is
+   * known but nothing is exposed to it yet.
+   */
+  describeInterface(): Promise<CallResult>;
 }
 
 /**
