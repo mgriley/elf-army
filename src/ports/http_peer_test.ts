@@ -6,21 +6,19 @@ import type { AddressInfo } from "node:net";
 import { HttpPeer } from "./http_peer.js";
 import type { CallResult, PeerManagerHandle } from "../peers/peer.js";
 
-/** A managerHandle whose response is swapped per test; records inbound calls. */
+const OK_RESPONSE = JSON.stringify({ status: 200, contentType: "text/plain", body: "ok" });
+
 class FakeHandle implements PeerManagerHandle {
   readonly calls: { funcName: string; inData: string }[] = [];
-  next: CallResult = { ok: true, value: "{}" };
-  /** Returned by describeInterface (GET /); swappable per test. */
-  description: CallResult = {
-    ok: true,
-    value: '{"name":"api","funcs":[{"name":"ping","inputSchema":{},"outputSchema":{}}]}',
-  };
+  next: CallResult = { ok: true, value: OK_RESPONSE };
+
   async invokeFunction(funcName: string, inData: string): Promise<CallResult> {
     this.calls.push({ funcName, inData });
     return this.next;
   }
+
   async describeInterface(): Promise<CallResult> {
-    return this.description;
+    return { ok: true, value: '{"name":"api","funcs":[]}' };
   }
 }
 
@@ -29,76 +27,72 @@ describe("HttpPeer", () => {
   let peer: HttpPeer;
   let handle: FakeHandle;
   let base: string;
+  const HANDLER = "handleRequest_public";
 
   beforeEach(async () => {
     handle = new FakeHandle();
     server = createServer();
-    peer = new HttpPeer(server, handle);
+    peer = new HttpPeer(server, handle, HANDLER);
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
 
-  afterEach(() => {
-    peer.close();
+  afterEach(() => peer.close());
+
+  it("routes any HTTP request to the handler function with request details", async () => {
+    handle.next = {
+      ok: true,
+      value: JSON.stringify({ status: 200, contentType: "text/html", body: "<h1>hi</h1>" }),
+    };
+    const res = await fetch(`${base}/hello?x=1`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "text/html");
+    assert.equal(await res.text(), "<h1>hi</h1>");
+    assert.equal(handle.calls.length, 1);
+    assert.equal(handle.calls[0].funcName, HANDLER);
+    const payload = JSON.parse(handle.calls[0].inData) as Record<string, string>;
+    assert.equal(payload.method, "GET");
+    assert.equal(payload.path, "/hello");
+    assert.deepEqual(payload.query, { x: "1" });
   });
 
-  it("advertises the assigned interface on GET /", async () => {
-    const res = await fetch(`${base}/`);
-    assert.equal(res.status, 200);
+  it("includes the request body in the payload", async () => {
+    await fetch(`${base}/submit`, { method: "POST", body: "hello world" });
+    const payload = JSON.parse(handle.calls[0].inData) as Record<string, string>;
+    assert.equal(payload.body, "hello world");
+  });
+
+  it("includes headers as a plain object in the payload", async () => {
+    await fetch(`${base}/`, { headers: { "x-custom": "test-value" } });
+    const payload = JSON.parse(handle.calls[0].inData) as Record<string, unknown>;
+    assert.equal(typeof payload.headers, "object");
+    assert.equal((payload.headers as Record<string, string>)["x-custom"], "test-value");
+  });
+
+  it("uses status, contentType, and body from the handler response", async () => {
+    handle.next = {
+      ok: true,
+      value: JSON.stringify({ status: 201, contentType: "application/json", body: '{"ok":true}' }),
+    };
+    const res = await fetch(`${base}/data`, { method: "POST" });
+    assert.equal(res.status, 201);
     assert.equal(res.headers.get("content-type"), "application/json");
-    assert.deepEqual(await res.json(), {
-      name: "api",
-      funcs: [{ name: "ping", inputSchema: {}, outputSchema: {} }],
-    });
-    assert.equal(handle.calls.length, 0); // discovery never reaches the function gate
+    assert.equal(await res.text(), '{"ok":true}');
   });
 
-  it("maps a describeInterface error on GET / onto an HTTP status", async () => {
-    handle.description = { ok: false, error: 'interface "api" no longer exists' };
-    const res = await fetch(`${base}/`);
-    assert.equal(res.status, 404);
-    assert.equal(await res.text(), 'interface "api" no longer exists');
-  });
-
-  it("forwards POST /<funcName> to invokeFunction and returns the value", async () => {
-    handle.next = { ok: true, value: '{"pong":true}' };
-    const res = await fetch(`${base}/ping`, { method: "POST", body: "42" });
-    assert.equal(res.status, 200);
-    assert.equal(await res.text(), '{"pong":true}');
-    assert.deepEqual(handle.calls, [{ funcName: "ping", inData: "42" }]);
-  });
-
-  it("treats an empty body as empty inData", async () => {
-    await fetch(`${base}/ping`, { method: "POST" });
-    assert.deepEqual(handle.calls, [{ funcName: "ping", inData: "" }]);
-  });
-
-  it("maps error results onto HTTP statuses", async () => {
+  it("maps invokeFunction errors onto HTTP statuses", async () => {
     const cases: [string, number][] = [
       ['peer "x" has no interface assigned', 403],
-      ['no function named "ping"', 404],
-      ['function "ping" is not in interface "api"', 404],
+      [`no function named "${HANDLER}"`, 404],
       ["input is not valid JSON", 400],
       ["boom at runtime", 500],
     ];
     for (const [error, status] of cases) {
       handle.next = { ok: false, error };
-      const res = await fetch(`${base}/ping`, { method: "POST", body: "{}" });
+      const res = await fetch(`${base}/`);
       assert.equal(res.status, status, `"${error}" -> ${status}`);
       assert.equal(await res.text(), error);
     }
-  });
-
-  it("rejects non-POST methods with 405", async () => {
-    const res = await fetch(`${base}/ping`, { method: "GET" });
-    assert.equal(res.status, 405);
-    assert.equal(handle.calls.length, 0);
-  });
-
-  it("rejects POST with no function name", async () => {
-    const res = await fetch(`${base}/`, { method: "POST", body: "{}" });
-    assert.equal(res.status, 404);
-    assert.equal(handle.calls.length, 0);
   });
 
   it("is inbound-only: sendRpc always fails", async () => {

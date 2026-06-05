@@ -18,6 +18,7 @@ import {
   type BooleanSchema,
   type JsonSchema,
   type LiteralSchema,
+  type MapSchema,
   type NumberSchema,
   type ObjectSchema,
   type OptionalSchema,
@@ -54,6 +55,11 @@ export function schemaArr(items: JsonSchema): ArraySchema {
 /** Schema for an object; every listed property is required. */
 export function schemaObj(properties: Record<string, JsonSchema>): ObjectSchema {
   return { type: "object", properties };
+}
+
+/** Schema for an object with arbitrary string keys, all values satisfying `values`. */
+export function schemaMap(values: JsonSchema): MapSchema {
+  return { type: "map", values };
 }
 
 /** Schema accepting `inner` or `null`. */

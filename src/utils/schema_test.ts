@@ -134,6 +134,42 @@ describe("validate — objects", () => {
   });
 });
 
+describe("validate — map", () => {
+  const schema: JsonSchema = { type: "map", values: { type: "string" } };
+
+  it("accepts an empty object", () => {
+    assert.deepEqual(validate(schema, {}), {});
+  });
+
+  it("accepts an object with arbitrary string keys", () => {
+    assert.deepEqual(validate(schema, { a: "x", b: "y" }), { a: "x", b: "y" });
+  });
+
+  it("preserves all keys (unlike object which drops undeclared keys)", () => {
+    const out = validate(schema, { foo: "1", bar: "2", baz: "3" });
+    assert.deepEqual(out, { foo: "1", bar: "2", baz: "3" });
+  });
+
+  it("rejects non-objects, null, and arrays", () => {
+    assert.throws(() => validate(schema, null), SchemaError);
+    assert.throws(() => validate(schema, "nope"), SchemaError);
+    assert.throws(() => validate(schema, []), SchemaError);
+  });
+
+  it("validates each value and reports the key in the path", () => {
+    assert.throws(
+      () => validate(schema, { a: "ok", b: 42 }),
+      (err: unknown) => err instanceof SchemaError && err.path === '$["b"]',
+    );
+  });
+
+  it("works with non-string value schemas", () => {
+    const numMap: JsonSchema = { type: "map", values: { type: "number" } };
+    assert.deepEqual(validate(numMap, { x: 1, y: 2 }), { x: 1, y: 2 });
+    assert.throws(() => validate(numMap, { x: "not-a-number" }), SchemaError);
+  });
+});
+
 describe("validate — optional", () => {
   const schema: JsonSchema = { type: "optional", inner: { type: "string" } };
 

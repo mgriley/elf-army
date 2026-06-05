@@ -1,34 +1,32 @@
 /**
  * An {@link AbstractPeer} over Node's built-in `http.Server` (zero deps) — the
- * edge that lets an elf act like a server. It is the HTTP counterpart to
- * {@link import("../spawn/ipc_peer.js").IpcPeer}: where IpcPeer wraps a duplex IPC
- * channel to one process, HttpPeer wraps a listening socket whose many anonymous
- * clients all share this single peer identity ("the public edge for port N").
+ * edge that lets an elf act like a server.
  *
- * It is *inbound-only*. There is no single counterparty to push to, so
- * {@link sendRpc} always fails as a value — an HttpPeer never initiates calls. Its
- * whole job is the inbound direction, translating an HTTP request into the exact
- * same call an IPC request makes:
+ * All inbound HTTP requests are forwarded to a single handler function (named at
+ * construction time, typically `handleRequest_<portName>`). The function receives
+ * the full request details and returns an HTTP response descriptor.
  *
- *   HTTP request -> (funcName, inData) -> managerHandle.invokeFunction -> CallResult -> HTTP response
+ *   HTTP request  ->  handlerFuncName({method,path,query,headers,body})
+ *                 ->  {status, contentType, body}
+ *                 ->  HTTP response
  *
- * So the peer's assigned interface is its public API surface, and access control
- * is reused verbatim — HttpPeer adds no new execution path or auth model.
+ * Request payload fields (all strings):
+ *   method   — HTTP verb (GET, POST, …)
+ *   path     — URL path, percent-decoded, no query string (e.g. "/hello")
+ *   query    — raw query string, empty string if none (e.g. "x=1&y=2")
+ *   headers  — request headers as a JSON-encoded object
+ *   body     — request body as UTF-8 text, empty string if none
  *
- * Wire mapping (V1, deliberately minimal):
- *   POST /<funcName>   body = inData (JSON text)
- *     { ok: true }  -> 200 + output JSON text
- *     { ok: false } -> 4xx/5xx + error string   (see {@link statusForError})
- *   GET  /             -> 200 + the assigned interface as JSON (names + schemas),
- *                         letting a client discover its full callable surface up
- *                         front. A peer with nothing exposed gets
- *                         `{"name":null,"funcs":[]}`. Doubles as a health/liveness
- *                         probe: a live edge always answers 200 here.
- *   anything else      -> 405 / 404
+ * Response payload fields:
+ *   status      — HTTP status code (integer)
+ *   contentType — Content-Type header value (string)
+ *   body        — response body as UTF-8 text (string)
  *
- * Because HTTP is natively request/response, there is no id-correlation tracker
- * (unlike IpcPeer, which multiplexes many calls over one channel): each request
- * is self-contained and handled concurrently.
+ * Errors from invokeFunction (unknown function, no interface, runtime failure,
+ * etc.) are mapped to HTTP status codes via {@link statusForError}.
+ *
+ * It is *inbound-only*: {@link sendRpc} always fails as a value — an HttpPeer
+ * never initiates calls.
  */
 
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
@@ -42,15 +40,11 @@ export class HttpPeer extends AbstractPeer {
   private closed = false;
   private readonly onRequest: (req: IncomingMessage, res: ServerResponse) => void;
 
-  /**
-   * Wraps an already-created `http.Server` and attaches its request handler. The
-   * server is *not* listening yet — {@link import("./ports_manager.js").PortsManager}
-   * owns calling `listen()` after attach, mirroring how SpawnManager `fork()`s the
-   * process it then hands to IpcPeer.
-   */
   constructor(
     private readonly server: Server,
     managerHandle: PeerManagerHandle,
+    /** Name of the function that handles all inbound requests for this port. */
+    private readonly handlerFuncName: string,
   ) {
     super(managerHandle);
     this.onRequest = (req, res) => void this.handleRequest(req, res);
@@ -67,47 +61,52 @@ export class HttpPeer extends AbstractPeer {
     if (this.closed) return;
     this.closed = true;
     this.server.off("request", this.onRequest);
-    // `close()` stops accepting new connections; we don't track keep-alive
-    // sockets, so in-flight requests are allowed to finish naturally.
     this.server.close();
   }
 
   private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const method = req.method ?? "GET";
-    // `req.url` is a path+query like "/ping?x=1"; we only key off the path.
-    const path = decodeURIComponent((req.url ?? "/").split("?", 1)[0]);
-
-    // Interface discovery, doubling as a health/liveness probe: advertise the
-    // peer's full callable surface (names + schemas) so a client knows what it
-    // may POST. The description is the same binding the call gate enforces.
-    if (method === "GET" && path === "/") {
-      const result = await this.managerHandle.describeInterface();
-      if (result.ok) {
-        return respond(res, 200, result.value, "application/json");
+    const rawUrl = req.url ?? "/";
+    const qIdx = rawUrl.indexOf("?");
+    const rawPath = qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl;
+    const query: Record<string, string> = {};
+    if (qIdx >= 0) {
+      for (const [key, val] of new URLSearchParams(rawUrl.slice(qIdx + 1))) {
+        query[key] = val;
       }
-      return respond(res, statusForError(result.error), result.error);
     }
-    if (method !== "POST") {
-      return respond(res, 405, `method ${method} not allowed; use POST /<funcName>`);
+    const path = decodeURIComponent(rawPath);
+
+    // Normalize to Record<string, string>: Node returns string[] only for
+    // set-cookie (duplicate values preserved as an array); join those with ", ".
+    const headers: Record<string, string> = {};
+    for (const [key, val] of Object.entries(req.headers)) {
+      if (val === undefined) continue;
+      headers[key] = Array.isArray(val) ? val.join(", ") : val;
     }
 
-    const funcName = path.replace(/^\/+/, "");
-    if (!funcName) {
-      return respond(res, 404, "missing function name; use POST /<funcName>");
-    }
-
-    let inData: string;
+    let body: string;
     try {
-      inData = await readBody(req);
+      body = await readBody(req);
     } catch (err) {
       return respond(res, 413, err instanceof Error ? err.message : String(err));
     }
 
-    const result = await this.managerHandle.invokeFunction(funcName, inData);
-    if (result.ok) {
-      return respond(res, 200, result.value, "application/json");
+    const inData = JSON.stringify({ method, path, query, headers, body });
+    const result = await this.managerHandle.invokeFunction(this.handlerFuncName, inData);
+
+    if (!result.ok) {
+      return respond(res, statusForError(result.error), result.error);
     }
-    return respond(res, statusForError(result.error), result.error);
+
+    let response: { status: number; contentType: string; body: string };
+    try {
+      response = JSON.parse(result.value) as typeof response;
+    } catch {
+      return respond(res, 500, "handler returned non-JSON response");
+    }
+
+    respond(res, response.status, response.body, response.contentType);
   }
 }
 
@@ -132,17 +131,14 @@ function readBody(req: IncomingMessage): Promise<string> {
 
 /**
  * Map a CallResult error string onto an HTTP status. The error is only a
- * human-readable string (Result carries no code), so this matches on the phrases
- * PeerManager/FunctionManager produce. Anything unrecognized is treated as a
- * server-side failure (500) rather than a client error.
+ * human-readable string, so this matches on phrases PeerManager/FunctionManager
+ * produce. Anything unrecognized is treated as a server-side failure (500).
  */
 function statusForError(error: string): number {
-  if (/has no interface assigned/.test(error)) return 403; // peer reachable, nothing exposed
-  if (/no function named|not in interface|no longer exists|no peer named/.test(error)) {
-    return 404; // function isn't part of this port's surface
-  }
-  if (/not valid JSON|input validation failed/.test(error)) return 400; // bad request
-  return 500; // runtime error, output validation, etc.
+  if (/has no interface assigned/.test(error)) return 403;
+  if (/no function named|not in interface|no longer exists|no peer named/.test(error)) return 404;
+  if (/not valid JSON|input validation failed/.test(error)) return 400;
+  return 500;
 }
 
 function respond(

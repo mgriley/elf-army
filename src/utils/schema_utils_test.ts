@@ -7,6 +7,7 @@ import {
   schemaDescribe,
   schemaInt,
   schemaLiteral,
+  schemaMap,
   schemaNum,
   schemaObj,
   schemaOptional,
@@ -23,6 +24,11 @@ describe("schema_utils — builders emit the canonical JSON", () => {
     assert.deepEqual(schemaInt(), { type: "integer" });
     assert.deepEqual(schemaBool(), { type: "boolean" });
     assert.deepEqual(schemaLiteral(true), { type: "literal", value: true });
+  });
+
+  it("builds a map schema", () => {
+    assert.deepEqual(schemaMap(schemaStr()), { type: "map", values: { type: "string" } });
+    assert.deepEqual(schemaMap(schemaInt()), { type: "map", values: { type: "integer" } });
   });
 
   it("nests compound builders", () => {

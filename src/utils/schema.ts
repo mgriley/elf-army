@@ -67,6 +67,17 @@ export interface UnionSchema extends BaseSchema {
   anyOf: JsonSchema[];
 }
 
+/**
+ * A plain object with arbitrary string keys, all values conforming to `values`.
+ * Unlike {@link ObjectSchema}, the key set is not fixed: all present keys pass
+ * through (none are dropped, none are required). Useful for headers, query-param
+ * bags, or any `Record<string, V>` shape.
+ */
+export interface MapSchema extends BaseSchema {
+  type: "map";
+  values: JsonSchema;
+}
+
 export type JsonSchema =
   | StringSchema
   | NumberSchema
@@ -75,7 +86,8 @@ export type JsonSchema =
   | ObjectSchema
   | OptionalSchema
   | LiteralSchema
-  | UnionSchema;
+  | UnionSchema
+  | MapSchema;
 
 /** Thrown on the first validation failure, carrying the path to the bad value. */
 export class SchemaError extends Error {
@@ -110,6 +122,8 @@ export function validate(
       return validateUnion(schema, value, path);
     case "object":
       return validateObject(schema, value, path);
+    case "map":
+      return validateMap(schema, value, path);
     case "array":
       return validateArray(schema, value, path);
     case "string":
@@ -175,6 +189,22 @@ function validateObject(
     out[key] = validate(sub, input[key], childPath);
   }
 
+  return out;
+}
+
+function validateMap(
+  schema: MapSchema,
+  value: unknown,
+  path: string,
+): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new SchemaError(path, "expected map");
+  }
+  const input = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(input)) {
+    out[key] = validate(schema.values, val, `${path}["${key}"]`);
+  }
   return out;
 }
 
