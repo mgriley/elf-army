@@ -16,7 +16,7 @@
  * Layout under `rootDir`:
  *   funcs/<name>.mjs   function code
  *   libs/<name>.mjs    shared-lib code
- *   manifest.json      schemas, func→lib links, interface membership
+ *   functions.json     schemas, func→lib links, interface membership
  *
  * Execution is delegated to a {@link WorkerExecutor} (a long-lived worker), so
  * user code never blocks the elf. The cache-busting version of each function/
@@ -149,7 +149,7 @@ export class FunctionManager {
   ) {
     this.funcsDir = path.join(rootDir, "funcs");
     this.libsDir = path.join(rootDir, "libs");
-    this.manifestPath = path.join(rootDir, "manifest.json");
+    this.manifestPath = path.join(rootDir, "functions.json");
     this.execTimeoutMs = opts.execTimeoutMs ?? DEFAULT_EXEC_TIMEOUT_MS;
     this.workerCount = opts.workerCount ?? 1;
     this.createExecutor =
