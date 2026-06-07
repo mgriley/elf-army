@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Elf Inspector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a1a; color: #e0e0e0;
+      font-family: 'SF Mono', Monaco, Inconsolata, monospace;
+      font-size: 13px; height: 100vh; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    #header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 16px; background: #111;
+      border-bottom: 1px solid #333; flex-shrink: 0;
+    }
+    .title { font-weight: bold; color: #fff; letter-spacing: .05em; }
+    #status { font-size: 11px; }
+    #status.live { color: #4caf50; }
+    #status.error { color: #f44336; }
+    #body { display: flex; flex: 1; overflow: hidden; }
+    #sidebar {
+      width: 280px; flex-shrink: 0; overflow-y: auto;
+      border-right: 1px solid #333; padding: 8px 0;
+    }
+    #content { flex: 1; overflow: auto; }
+    .row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 8px 3px 0; cursor: pointer;
+      user-select: none; white-space: nowrap;
+      border-radius: 3px; margin: 0 4px;
+    }
+    .row:hover { background: #2a2a2a; }
+    .row.selected { background: #1d3a5e; }
+    .chevron { color: #555; width: 12px; text-align: center; flex-shrink: 0; }
+    .dir > .name { color: #90caf9; }
+    .file > .name { color: #ccc; }
+    #file-path {
+      padding: 8px 16px; border-bottom: 1px solid #333;
+      color: #666; font-size: 11px; background: #111;
+    }
+    #file-body {
+      padding: 16px; white-space: pre-wrap;
+      word-break: break-word; line-height: 1.6; color: #ddd;
+    }
+    .dim { padding: 24px; color: #555; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <span class="title">Elf Inspector</span>
+    <span id="status"></span>
+  </div>
+  <div id="body">
+    <div id="sidebar"></div>
+    <div id="content"><div class="dim">Select a file to inspect</div></div>
+  </div>
+  <script src="app.js" type="module"></script>
+</body>
+</html>

@@ -46,6 +46,7 @@ import { peerManagerTools } from "./peers/tools.js";
 import { PortsManager } from "./ports/ports_manager.js";
 import { portsManagerTools } from "./ports/tools.js";
 import { IpcPeer, type IpcChannel } from "./spawn/ipc_peer.js";
+import { startInspectorServer } from "./inspector/server.js";
 import { SpawnManager } from "./spawn/spawn_manager.js";
 import { spawnManagerTools } from "./spawn/tools.js";
 
@@ -98,6 +99,11 @@ export class Elf {
     console.log(`Loaded config...`);
 
     await this.createWorkDir(config.rootDir);
+
+    // The inspector server exposes an admin port that serves a 
+    // web UI for inspecting the elf's state and activity.
+    startInspectorServer(config.rootDir);
+
     await Promise.all([
       this.run(config, config.rootDir, ROOT_PURPOSE),
       // TODO - should the CLI just be a peer we register for root? Probs,
