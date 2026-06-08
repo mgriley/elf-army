@@ -3,21 +3,24 @@
  * keep (customer accounts, app state, …).
  *
  * The interface is a deliberately plain hierarchical KV store: keys are
- * arbitrary strings (the agent tends to organize them like paths, e.g.
- * `customers/123/name`), values are strings. Four operations:
+ * slash-separated path strings (e.g. `customers/123/name`), values are strings.
+ * Four operations:
  *   - setValue(key, value)        upsert
  *   - getValue(key)               -> Result<string>
  *   - deleteValue(key)            idempotent
  *   - listKeysWithPrefix(prefix)  -> Result<string[]>
  *
+ * Keys must match VALID_KEY: segments of [A-Za-z0-9_-] joined by `/`. This
+ * strict allowlist means slashes are the only character that needs escaping on
+ * disk, and the mapping is trivially reversible.
+ *
  * Unlike the other managers, this one does NOT cache in memory: customer data
  * can be large and unbounded, so disk is the source of truth and every read and
  * write hits the underlying files directly.
  *
- * On-disk layout: a single flat directory, one file per entry, whose filename is
- * the key percent-encoded (so `/` and other separators can't create nested dirs
- * or escape the root, and the mapping is losslessly reversible for listing):
- *   database/<percent-encoded-key>
+ * On-disk layout: a single flat directory, one file per entry, whose filename
+ * is the key with `/` replaced by `#`:
+ *   database/customers#123#name
  *
  * Writes are atomic — value is written to a temp file and `rename`d into place —
  * so a crash mid-write can never leave a half-written value. Reads return a
@@ -35,9 +38,12 @@ import process from "node:process";
 import type { Result } from "../utils/utils.js";
 import { Logger } from "../utils/logger.js";
 
+// Key segments: alphanumeric, underscore, hyphen; segments joined by `/`.
+const VALID_KEY = /^[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*$/;
+
 // Temp files for atomic writes live alongside their target with this suffix.
-// Encoded keys never contain a literal "." (see encodeKey), so this suffix can
-// never collide with a real entry and lets listing skip in-flight writes.
+// Valid keys never contain "." so this suffix can never collide with a real
+// entry and lets listing skip in-flight writes.
 const TMP_SUFFIX = ".tmp";
 
 export class Database {
@@ -114,36 +120,28 @@ export class Database {
     }
     const keys: string[] = [];
     for (const entry of entries) {
-      if (!entry.isFile() || entry.name.endsWith(TMP_SUFFIX)) continue;
-      const key = decodeKey(entry.name);
+      if (!entry.isFile()) continue;
+      const key = filenameToKey(entry.name);
       if (key !== undefined && key.startsWith(prefix)) keys.push(key);
     }
     return { ok: true, value: keys };
   }
 
   private keyToPath(key: string): string {
-    return path.join(this.dataDir, encodeKey(key));
+    return path.join(this.dataDir, keyToFilename(key));
   }
 }
 
-/**
- * Encode a key as a single safe filename. `encodeURIComponent` handles `/` and
- * other separators; we additionally escape `.` so a key can never become `.`,
- * `..`, or a dotfile, and so the temp-file suffix stays unambiguous. The mapping
- * is reversible via {@link decodeKey}.
- */
-function encodeKey(key: string): string {
-  if (key === "") throw new Error("database key must be non-empty");
-  return encodeURIComponent(key).replaceAll(".", "%2E");
+/** Key → filename: replace `/` with `#`. Throws if the key is invalid. */
+function keyToFilename(key: string): string {
+  if (!VALID_KEY.test(key)) throw new Error(`invalid database key: "${key}" — keys must match ${VALID_KEY} (alphanumeric/underscore/hyphen segments separated by "/")`);
+  return key.replaceAll("/", "#");
 }
 
-/** Inverse of {@link encodeKey}; undefined if `name` isn't a valid encoding. */
-function decodeKey(name: string): string | undefined {
-  try {
-    return decodeURIComponent(name);
-  } catch {
-    return undefined;
-  }
+/** Filename → key: replace `#` with `/`. Returns undefined for non-entry files (e.g. temp files). */
+function filenameToKey(name: string): string | undefined {
+  if (name.endsWith(TMP_SUFFIX)) return undefined;
+  return name.replaceAll("#", "/");
 }
 
 function message(err: unknown): string {

@@ -15,7 +15,7 @@ export function databaseTools(db: Database): Tool[] {
       parameters: {
         type: "object",
         properties: {
-          key: { type: "string", description: "The key to set." },
+          key: { type: "string", description: "The key to set. Must be alphanumeric/underscore/hyphen segments separated by \"/\" (e.g. `users/42/name`)." },
           value: { type: "string", description: "The string value to store." },
         },
       },
