@@ -16,6 +16,7 @@
  * notes) and brings child elves + ports back up where they left off.
  */
 
+import { spawn } from "node:child_process";
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -32,6 +33,7 @@ import {
 } from "./utils/schema_utils.js";
 
 import { Agent } from "./agent/agent.js";
+import { Logger } from "./utils/logger.js";
 import { runCli } from "./cli.js";
 import { ELF_SYSTEM_PROMPT, ROOT_PURPOSE } from "./elf_prompt.js";
 
@@ -46,7 +48,6 @@ import { peerManagerTools } from "./peers/tools.js";
 import { PortsManager } from "./ports/ports_manager.js";
 import { portsManagerTools } from "./ports/tools.js";
 import { IpcPeer, type IpcChannel } from "./spawn/ipc_peer.js";
-import { startInspectorServer } from "./inspector/server.js";
 import { SpawnManager } from "./spawn/spawn_manager.js";
 import { spawnManagerTools } from "./spawn/tools.js";
 
@@ -57,6 +58,17 @@ const ENTRY_SCRIPT = path.join(path.dirname(HERE), `main${path.extname(HERE)}`);
 
 // The peer name an elf gives the IPC edge back to whoever forked it.
 const PARENT_PEER = "parent";
+
+function spawnInspector(rootDir: string): void {
+  const ext = path.extname(HERE); // '.ts' in dev, '.js' in prod
+  const main = path.join(path.dirname(HERE), "inspector", `main${ext}`);
+  const args = ext === ".ts"
+    ? ["--import", "tsx", main, rootDir]
+    : [main, rootDir];
+  const child = spawn(process.execPath, args, { stdio: "inherit" });
+  child.unref(); // don't hold the root's event loop open
+  process.on("exit", () => child.kill());
+}
 
 export type ElfId = string;
 
@@ -100,9 +112,9 @@ export class Elf {
 
     await this.createWorkDir(config.rootDir);
 
-    // The inspector server exposes an admin port that serves a 
+    // The inspector server exposes an admin port that serves a
     // web UI for inspecting the elf's state and activity.
-    startInspectorServer(config.rootDir);
+    spawnInspector(config.rootDir);
 
     await Promise.all([
       this.run(config, config.rootDir, ROOT_PURPOSE),
@@ -122,6 +134,8 @@ export class Elf {
     process.chdir(elfDir);
     this.config = config;
     this.elfDir = elfDir;
+    Logger.init(elfDir);
+    Logger.logEvent("[elf] started");
 
     // Construct all managers synchronously first (no awaits), then build the
     // agent with tools that close over them. Everything is still set before the
@@ -156,6 +170,8 @@ export class Elf {
     if (purpose && !this.notesManager.getNote("Purpose")) {
       await this.notesManager.setNote("Purpose", purpose);
     }
+    const purposeNote = this.notesManager.getNote("Purpose");
+    if (purposeNote) Logger.logEvent(`[elf] purpose: ${purposeNote.split("\n")[0].trim()}`);
     await this.portsManager.start();
     this.registerSyscalls();
 

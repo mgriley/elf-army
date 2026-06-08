@@ -33,6 +33,7 @@ import path from "node:path";
 import process from "node:process";
 
 import type { Result } from "../utils/utils.js";
+import { Logger } from "../utils/logger.js";
 
 // Temp files for atomic writes live alongside their target with this suffix.
 // Encoded keys never contain a literal "." (see encodeKey), so this suffix can
@@ -74,6 +75,7 @@ export class Database {
       await rm(tmp, { force: true }); // don't leave a stray temp file behind
       throw err;
     }
+    Logger.logEvent(`[database] set "${key}"`);
   }
 
   /**
@@ -95,6 +97,7 @@ export class Database {
   /** Remove the value at `key`. No-op if there's nothing there. */
   async deleteValue(key: string): Promise<void> {
     await rm(this.keyToPath(key), { force: true });
+    Logger.logEvent(`[database] deleted "${key}"`);
   }
 
   /**

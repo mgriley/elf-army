@@ -20,6 +20,8 @@
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { Logger } from "../utils/logger.js";
+
 // Names double as filenames, so keep them to a safe, portable subset (the same
 // rule FunctionManager and PeerManager use).
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
@@ -55,6 +57,7 @@ export class NotesManager {
     assertValidName(name);
     await writeFile(this.notePath(name), content);
     this.notes.set(name, content);
+    Logger.logEvent(`[notes] set "${name}"`);
   }
 
   /** The note's content, or undefined if there's no such note. */
@@ -67,6 +70,7 @@ export class NotesManager {
     if (!this.notes.has(name)) return;
     this.notes.delete(name);
     await rm(this.notePath(name), { force: true });
+    Logger.logEvent(`[notes] deleted "${name}"`);
   }
 
   /** The names of all notes, in no particular order. */

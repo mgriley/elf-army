@@ -31,6 +31,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { HttpPeer } from "./http_peer.js";
+import { Logger } from "../utils/logger.js";
 import { assertValidPeerName, type PeerManager } from "../peers/peer_manager.js";
 import type { FunctionManager } from "../functions/function_manager.js";
 import type { JsonSchema } from "../utils/schema.js";
@@ -158,6 +159,7 @@ export class PortsManager {
     const boundPort = actualPort(server) ?? options.port;
     this.ports.set(name, { name, port: boundPort, host, server });
     await this.persist();
+    Logger.logEvent(`[port] opened "${name}" on ${host}:${boundPort}`);
   }
 
   /**
@@ -182,6 +184,7 @@ export class PortsManager {
     if (!entry?.server) return;
     entry.server = undefined;
     this.peerManager.detachPeer(name);
+    Logger.logEvent(`[port] closed "${name}"`);
   }
 
   /**
@@ -195,6 +198,7 @@ export class PortsManager {
     await this.functionManager.removeInterface(httpInterfaceName(name));
     await this.functionManager.removeFunc(handlerFuncName(name));
     await this.persist();
+    Logger.logEvent(`[port] removed "${name}"`);
   }
 
   /** Names of ports currently listening. */
