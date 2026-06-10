@@ -3,8 +3,8 @@
  * as peers with the PeerManager.
  *
  * In V1 the only peers are processes in our own tree: we talk to children we
- * fork (and, separately, to the parent that forked us). SpawnManager owns the
- * *existence* side of that — forking a child, tracking its process, restarting
+ * spawn (and, separately, to the parent that spawned us). SpawnManager owns the
+ * *existence* side of that — spawning a child, tracking its process, restarting
  * the set on startup, tearing one down — and hands each live child to
  * {@link PeerManager} as an {@link IpcPeer}. It deliberately knows nothing about
  * interfaces; the binding (and its persistence) lives in PeerManager.
@@ -21,46 +21,39 @@ import path from "node:path";
 
 import { findAllSubdirs } from "../utils/utils.js";
 import { Logger } from "../utils/logger.js";
+import { resolveScript } from "../utils/spawn.js";
 import { IpcPeer } from "./ipc_peer.js";
 import { assertValidPeerName, type PeerManager } from "../peers/peer_manager.js";
 
 export interface SpawnManagerOptions {
   /** Directory holding one subdir per child elf (its workspace). */
   childrenDir: string;
-  /** Script to `fork` for each child (typically the elf's own entry point). */
-  entryScript: string;
+  /** `import.meta.url` of the calling module; used to resolve the child entry point. */
+  importMetaUrl: string;
   /** PeerManager to register each spawned child's connection with. */
   peerManager: PeerManager;
   /**
-   * Build the IPC init message handed to a freshly forked child. Receives the
+   * Build the IPC init message handed to a freshly spawned child. Receives the
    * child's workspace dir and its purpose (undefined when respawning an existing
    * child whose Purpose note already exists). Node buffers it until the child's
    * event loop starts.
    */
   initPayload: (childDir: string, purpose?: string) => Serializable;
-  /**
-   * Extra `execArgv` for forked children. Defaults to forwarding the tsx loader
-   * when the entry script is a `.ts` file, matching how this elf was launched.
-   */
-  execArgv?: string[];
 }
 
 export class SpawnManager {
   private readonly children = new Map<string, ChildProcess>();
   private readonly childrenDir: string;
-  private readonly entryScript: string;
+  private readonly script: string;
+  private readonly execArgv: string[];
   private readonly peerManager: PeerManager;
   private readonly initPayload: (childDir: string, purpose?: string) => Serializable;
-  private readonly execArgv: string[];
 
   constructor(opts: SpawnManagerOptions) {
     this.childrenDir = opts.childrenDir;
-    this.entryScript = opts.entryScript;
+    ({ script: this.script, execArgv: this.execArgv } = resolveScript(opts.importMetaUrl, "main"));
     this.peerManager = opts.peerManager;
     this.initPayload = opts.initPayload;
-    this.execArgv =
-      opts.execArgv ??
-      (path.extname(opts.entryScript) === ".ts" ? ["--import", "tsx"] : []);
   }
 
   /**
@@ -126,7 +119,7 @@ export class SpawnManager {
 
   /** Fork a child for `childDir`, register it as a peer, and track its process. */
   private async launch(name: string, childDir: string, purpose?: string): Promise<void> {
-    const proc = fork(this.entryScript, [], { execArgv: this.execArgv });
+    const proc = fork(this.script, [], { execArgv: this.execArgv });
     proc.send(this.initPayload(childDir, purpose));
     this.children.set(name, proc);
 

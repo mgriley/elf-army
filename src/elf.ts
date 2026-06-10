@@ -16,11 +16,9 @@
  * notes) and brings child elves + ports back up where they left off.
  */
 
-import { spawn } from "node:child_process";
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 
 import { Schema } from "./utils/schema.js";
 import {
@@ -50,23 +48,15 @@ import { portsManagerTools } from "./ports/tools.js";
 import { IpcPeer, type IpcChannel } from "./spawn/ipc_peer.js";
 import { SpawnManager } from "./spawn/spawn_manager.js";
 import { spawnManagerTools } from "./spawn/tools.js";
+import { spawnScript } from "./utils/spawn.js";
 
-// Path to main.{js,ts} sitting next to this file. The extension follows our
-// current runtime: `.js` when running compiled output, `.ts` under tsx.
-const HERE = fileURLToPath(import.meta.url);
-const ENTRY_SCRIPT = path.join(path.dirname(HERE), `main${path.extname(HERE)}`);
 
 // The peer name an elf gives the IPC edge back to whoever forked it.
 const PARENT_PEER = "parent";
 
 function spawnInspector(rootDir: string): void {
-  const ext = path.extname(HERE); // '.ts' in dev, '.js' in prod
-  const main = path.join(path.dirname(HERE), "inspector", `main${ext}`);
-  const args = ext === ".ts"
-    ? ["--import", "tsx", main, rootDir]
-    : [main, rootDir];
-  const child = spawn(process.execPath, args, { stdio: "inherit" });
-  child.unref(); // don't hold the root's event loop open
+  const child = spawnScript(import.meta.url, "inspector/main", [rootDir]);
+  child.unref();
   process.on("exit", () => child.kill());
 }
 
@@ -146,7 +136,7 @@ export class Elf {
     this.notesManager = new NotesManager(elfDir);
     this.spawnManager = new SpawnManager({
       childrenDir: path.join(elfDir, "children"),
-      entryScript: ENTRY_SCRIPT,
+      importMetaUrl: import.meta.url,
       peerManager: this.peerManager,
       initPayload: (childDir, purpose) => ({ config, elfDir: childDir, purpose }),
     });
