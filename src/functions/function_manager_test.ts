@@ -21,7 +21,7 @@ describe("FunctionManager", () => {
   let fm: FunctionManager;
 
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "elf-fm-"));
+    dir = await mkdtemp(path.join(tmpdir(), "goblin-fm-"));
     fm = new FunctionManager(dir, { execTimeoutMs: 2000 });
     await fm.start();
   });
@@ -99,7 +99,7 @@ describe("FunctionManager", () => {
   });
 
   it("times out a hung function without throwing", async () => {
-    const slowDir = await mkdtemp(path.join(tmpdir(), "elf-fm-slow-"));
+    const slowDir = await mkdtemp(path.join(tmpdir(), "goblin-fm-slow-"));
     const slow = new FunctionManager(slowDir, { execTimeoutMs: 200 });
     await slow.start();
     try {
@@ -233,7 +233,7 @@ describe("FunctionManager", () => {
 
 describe("FunctionManager persistence", () => {
   it("restores functions, libs, and interfaces across restarts", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "elf-fm-persist-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "goblin-fm-persist-"));
     try {
       const first = new FunctionManager(dir, { execTimeoutMs: 2000 });
       await first.start();

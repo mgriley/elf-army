@@ -61,7 +61,7 @@ describe("PeerManager", () => {
   let pm: PeerManager;
 
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "elf-pm-"));
+    dir = await mkdtemp(path.join(tmpdir(), "goblin-pm-"));
     pm = new PeerManager(dir, gateway);
     await pm.start();
   });
@@ -200,7 +200,7 @@ describe("PeerManager", () => {
 
 describe("PeerManager persistence", () => {
   it("restores interface bindings across restarts", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "elf-pm-persist-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "goblin-pm-persist-"));
     try {
       const first = new PeerManager(dir, gateway);
       await first.start();

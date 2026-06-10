@@ -1,5 +1,5 @@
 /**
- * PortsManager — handles opening HTTP listening ports so that the Elf can expose
+ * PortsManager — handles opening HTTP listening ports so that the Goblin can expose
  * its own HTTP server. Does so by registering `HttpPeer`s with the PeerManager.
  *
  * It is to sockets what {@link import("../spawn/spawn_manager.js").SpawnManager} is to
@@ -13,7 +13,7 @@
  *   - an interface `http_<name>` exposing that function
  *   - the peer's interface assignment pointing at `http_<name>`
  *
- * All inbound HTTP requests flow through that single function, giving the elf
+ * All inbound HTTP requests flow through that single function, giving the goblin
  * full control over routing, response codes, and content types. To change the
  * behaviour of a port, modify `handleRequest_<name>` via FunctionManager.
  *
@@ -76,7 +76,7 @@ export async function handle(input) {
   return {
     status: 200,
     contentType: "text/plain; charset=utf-8",
-    body: "Hello from ElfArmy!",
+    body: "Hello from Goblin!",
   };
 }
 `;
@@ -225,7 +225,7 @@ export class PortsManager {
     try {
       store = JSON.parse(await readFile(this.storePath, "utf8")) as PortStore;
     } catch (err) {
-      if ((err as { code?: string }).code === "ENOENT") return; // fresh elf
+      if ((err as { code?: string }).code === "ENOENT") return; // fresh goblin
       throw err;
     }
     for (const [name, meta] of Object.entries(store.ports ?? {})) {

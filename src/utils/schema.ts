@@ -228,7 +228,7 @@ export type ParseResult<T> =
 /**
  * Ergonomic wrapper around a {@link JsonSchema}. The type parameter `T` lets
  * callers annotate the expected output shape (it is not inferred from the
- * schema — hand-write the matching TS type, e.g. `new Schema<ElfConfig>(...)`).
+ * schema — hand-write the matching TS type, e.g. `new Schema<GoblinConfig>(...)`).
  */
 export class Schema<T = unknown> {
   constructor(readonly definition: JsonSchema) {}

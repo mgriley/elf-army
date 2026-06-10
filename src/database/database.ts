@@ -1,5 +1,5 @@
 /**
- * Database — an elf's private key/value store for whatever data it needs to
+ * Database — an goblin's private key/value store for whatever data it needs to
  * keep (customer accounts, app state, …).
  *
  * The interface is a deliberately plain hierarchical KV store: keys are

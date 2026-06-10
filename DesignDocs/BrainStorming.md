@@ -41,7 +41,7 @@ I want a parent to be able to route requests to one of its children, though. How
 like I want some sort of IPC-esque router.
 
 Okay, so can go a couple directions here, I think:
-A: Each elf can execute subprocesses / interpreted scripts to handle requests. Can register the handlers
+A: Each goblin can execute subprocesses / interpreted scripts to handle requests. Can register the handlers
 using a tool-call API.
 
 How to allow flexible route handling?
@@ -62,11 +62,11 @@ How can I code something like:
 - When I get the 'add-user' message from my parent, I either need to delegate it to my  
 child or do some more complex handling logic. 
 
-Okay, what about this -> Each Elf can register handlers for routes, which are some javascript
+Okay, what about this -> Each Goblin can register handlers for routes, which are some javascript
 
 Okay, I think let's try this, to start:
 
-- Each Elf is just an actor with a built-in router+agent.
+- Each Goblin is just an actor with a built-in router+agent.
 
 -- All incoming messages are handled by the route handler.
 -- You can register dynamic handlers by hot-loading javascript modules.

@@ -1,7 +1,7 @@
 /**
- * FunctionManager — an elf's mini library of self-contained micro-functions.
+ * FunctionManager — an goblin's mini library of self-contained micro-functions.
  *
- * The mental model: an elf authors small functions, groups them into named
+ * The mental model: an goblin authors small functions, groups them into named
  * "interfaces", and exposes an interface to a peer to grant exactly that set of
  * callable functions. Functions may pull in shared "libs" for reuse.
  *
@@ -12,14 +12,14 @@
  *   - shared libs: a module exporting a single `lib` value, injected into funcs
  *
  * Persistence: in-memory maps are the source of truth at runtime; every change
- * is mirrored to disk so an elf restores its full function state on restart.
+ * is mirrored to disk so an goblin restores its full function state on restart.
  * Layout under `rootDir`:
  *   funcs/<name>.mjs   function code
  *   libs/<name>.mjs    shared-lib code
  *   functions.json     schemas, func→lib links, interface membership
  *
  * Execution is delegated to a {@link WorkerExecutor} (a long-lived worker), so
- * user code never blocks the elf. The cache-busting version of each function/
+ * user code never blocks the goblin. The cache-busting version of each function/
  * lib is the hash of its code (derived on load, never persisted), so a code
  * change forces a fresh dynamic `import` with no version tracking.
  */
@@ -447,7 +447,7 @@ export class FunctionManager {
    * Register a host-provided function callable from user code via `sys.call(name, input)`.
    * Input and output are validated against the supplied schemas, same as regular functions.
    * 
-   * These registrations are not persisted. The expectation is that the elf's main script
+   * These registrations are not persisted. The expectation is that the goblin's main script
    * registers all the syscalls on startup.
    */
   registerSyscall(
@@ -544,7 +544,7 @@ export class FunctionManager {
     try {
       manifest = JSON.parse(await readFile(this.manifestPath, "utf8")) as Manifest;
     } catch (err) {
-      if ((err as { code?: string }).code === "ENOENT") return; // fresh elf
+      if ((err as { code?: string }).code === "ENOENT") return; // fresh goblin
       throw err;
     }
 

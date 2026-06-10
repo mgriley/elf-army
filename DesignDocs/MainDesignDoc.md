@@ -1,10 +1,10 @@
-# ElfArmy Runtime Architecture
+# Goblin Runtime Architecture
 
 ## Overview
 
-ElfArmy is a hierarchical autonomous runtime system built in Node.js.
+Goblin is a hierarchical autonomous runtime system built in Node.js.
 
-The system is composed of many small autonomous workers called **elves**. Each elf is an isolated process with its own workspace, state, and execution context. Elves can recursively spawn sub-elves to delegate tasks, forming a tree-like hierarchy of autonomous workers.
+The system is composed of many small autonomous workers called **goblins**. Each goblin is an isolated process with its own workspace, state, and execution context. Goblins can recursively spawn sub-goblins to delegate tasks, forming a tree-like hierarchy of autonomous workers.
 
 The overall philosophy is:
 
@@ -18,7 +18,7 @@ The architecture intentionally resembles:
 * autonomous coding agents
 * microservice orchestration systems
 
-However, ElfArmy aims to remain lightweight and developer-friendly.
+However, Goblin aims to remain lightweight and developer-friendly.
 
 ---
 
@@ -53,22 +53,22 @@ The first versions should optimize for:
 
 ---
 
-# Core Concept: The Elf
+# Core Concept: The Goblin
 
-An elf is fundamentally:
+An goblin is fundamentally:
 
 > An autonomous workspace-owning agent process.
 
-Each elf:
+Each goblin:
 
 * runs as an independent Node.js process
 * owns an isolated directory
 * communicates via IPC messages
-* may spawn child elves
+* may spawn child goblins
 * maintains its own state
 * performs tasks autonomously
 
-An elf is NOT fundamentally:
+An goblin is NOT fundamentally:
 
 * an HTTP server
 * a REST service
@@ -83,18 +83,18 @@ The process itself represents an autonomous agent identity.
 
 ## Hierarchical Supervision Tree
 
-ElfArmy uses a recursive parent-child model.
+Goblin uses a recursive parent-child model.
 
 Example:
 
 ```text
 Master Runtime
- └── Architect Elf
-      ├── Backend Elf
-      │    ├── API Elf
-      │    └── Database Elf
-      ├── Frontend Elf
-      └── Testing Elf
+ └── Architect Goblin
+      ├── Backend Goblin
+      │    ├── API Goblin
+      │    └── Database Goblin
+      ├── Frontend Goblin
+      └── Testing Goblin
 ```
 
 Each parent:
@@ -117,9 +117,9 @@ This model is inspired by:
 
 ## Node.js Controllers
 
-Each elf runs as a Node.js controller process.
+Each goblin runs as a Node.js controller process.
 
-Elf controllers are launched using:
+Goblin controllers are launched using:
 
 ```js
 child_process.fork()
@@ -138,7 +138,7 @@ This creates:
 
 ## IPC Strategy
 
-ElfArmy uses:
+Goblin uses:
 
 * `process.send()`
 * `process.on("message")`
@@ -161,7 +161,7 @@ Internally, Node.js implements this using:
 
 # Why IPC Instead of HTTP
 
-HTTP servers per elf were intentionally rejected.
+HTTP servers per goblin were intentionally rejected.
 
 Reasons:
 
@@ -176,7 +176,7 @@ Instead:
 * IPC is the primary communication layer
 * HTTP may optionally exist at boundaries/debug interfaces
 
-ElfArmy is fundamentally:
+Goblin is fundamentally:
 
 > a message-driven process system
 
@@ -188,7 +188,7 @@ not:
 
 # Messaging Philosophy
 
-Elf communication should behave like actor mailboxes.
+Goblin communication should behave like actor mailboxes.
 
 Messages are:
 
@@ -215,8 +215,8 @@ Example:
 ```ts
 {
   type: "task",
-  from: "architect-elf",
-  to: "backend-elf",
+  from: "architect-goblin",
+  to: "backend-goblin",
   payload: {
     objective: "Implement authentication"
   }
@@ -229,7 +229,7 @@ Example:
 
 ## Parent-Routed Messaging
 
-Initial versions should NOT allow arbitrary direct elf-to-elf communication.
+Initial versions should NOT allow arbitrary direct goblin-to-goblin communication.
 
 Instead:
 
@@ -265,20 +265,20 @@ This preserves a clean hierarchical model.
 
 # Workspace Isolation
 
-Every elf owns its own isolated directory.
+Every goblin owns its own isolated directory.
 
 Example structure:
 
 ```text
-elf-army/
+goblin/
   runtime/
-  elves/
-    elf-001/
+  goblins/
+    goblin-001/
       workspace/
       state/
       logs/
       config.json
-    elf-002/
+    goblin-002/
 ```
 
 ## Workspace Contains
@@ -360,7 +360,7 @@ Compared to a single monolithic runtime:
 
 # Lifecycle Management
 
-Every elf should have:
+Every goblin should have:
 
 * a unique ID
 * a parent ID
@@ -390,20 +390,20 @@ Parents are responsible for:
 
 # Recommended Runtime Abstractions
 
-## Elf Class
+## Goblin Class
 
 Suggested conceptual abstraction:
 
 ```ts
-class Elf {
+class Goblin {
   id: string;
-  parent?: Elf;
-  children: Elf[];
+  parent?: Goblin;
+  children: Goblin[];
   workspacePath: string;
 
   send(message): void;
   request(type, payload): Promise<any>;
-  spawn(spec): Promise<Elf>;
+  spawn(spec): Promise<Goblin>;
   kill(): Promise<void>;
 }
 ```
@@ -447,7 +447,7 @@ The runtime should support async request/response semantics.
 Example:
 
 ```ts
-await elf.request("task", {
+await goblin.request("task", {
   objective: "Write tests"
 });
 ```
@@ -467,15 +467,15 @@ This avoids deeply nested callback/message code.
 
 ## Step 1
 
-Architect elf receives a high-level objective.
+Architect goblin receives a high-level objective.
 
 ## Step 2
 
-Architect elf spawns specialized children:
+Architect goblin spawns specialized children:
 
-* backend elf
-* frontend elf
-* testing elf
+* backend goblin
+* frontend goblin
+* testing goblin
 
 ## Step 3
 
@@ -487,7 +487,7 @@ Children report results upward.
 
 ## Step 5
 
-Architect elf aggregates outputs.
+Architect goblin aggregates outputs.
 
 ---
 
@@ -519,7 +519,7 @@ Possible additions:
 
 ## V3
 
-Containerized elves.
+Containerized goblins.
 
 Possible additions:
 
@@ -534,7 +534,7 @@ Distributed execution.
 
 Possible additions:
 
-* remote elf nodes
+* remote goblin nodes
 * distributed routing
 * remote supervisors
 * cluster coordination
@@ -612,7 +612,7 @@ The initial focus should remain:
 
 # Design Philosophy
 
-ElfArmy should feel like:
+Goblin should feel like:
 
 * a living workshop
 * a colony of autonomous builders
@@ -636,9 +636,9 @@ The central idea is:
 
 # Summary
 
-ElfArmy is a hierarchical autonomous runtime composed of isolated Node.js subprocesses called elves.
+Goblin is a hierarchical autonomous runtime composed of isolated Node.js subprocesses called goblins.
 
-Each elf:
+Each goblin:
 
 * owns a workspace
 * communicates through IPC

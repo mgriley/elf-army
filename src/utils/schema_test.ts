@@ -89,22 +89,22 @@ describe("validate — objects", () => {
   };
 
   it("accepts well-formed objects", () => {
-    assert.deepEqual(validate(schema, { name: "Elf", age: 3 }), {
-      name: "Elf",
+    assert.deepEqual(validate(schema, { name: "Goblin", age: 3 }), {
+      name: "Goblin",
       age: 3,
     });
   });
 
   it("treats every listed property as required", () => {
     assert.throws(
-      () => validate(schema, { name: "Elf" }),
+      () => validate(schema, { name: "Goblin" }),
       (err: unknown) => err instanceof SchemaError && err.path === "$.age",
     );
   });
 
   it("treats an explicit undefined as missing", () => {
     assert.throws(
-      () => validate(schema, { name: "Elf", age: undefined }),
+      () => validate(schema, { name: "Goblin", age: undefined }),
       SchemaError,
     );
   });
@@ -116,8 +116,8 @@ describe("validate — objects", () => {
   });
 
   it("drops keys not declared in properties", () => {
-    const out = validate(schema, { name: "Elf", age: 3, extra: true });
-    assert.deepEqual(out, { name: "Elf", age: 3 });
+    const out = validate(schema, { name: "Goblin", age: 3, extra: true });
+    assert.deepEqual(out, { name: "Goblin", age: 3 });
   });
 
   it("reports nested paths", () => {
@@ -332,7 +332,7 @@ describe("Schema wrapper", () => {
   });
 
   it("parse returns the validated value", () => {
-    assert.deepEqual(schema.parse({ name: "Elf" }), { name: "Elf" });
+    assert.deepEqual(schema.parse({ name: "Goblin" }), { name: "Goblin" });
   });
 
   it("parse throws on invalid input", () => {
@@ -340,9 +340,9 @@ describe("Schema wrapper", () => {
   });
 
   it("safeParse returns an ok result on success", () => {
-    assert.deepEqual(schema.safeParse({ name: "Elf" }), {
+    assert.deepEqual(schema.safeParse({ name: "Goblin" }), {
       ok: true,
-      value: { name: "Elf" },
+      value: { name: "Goblin" },
     });
   });
 
@@ -353,7 +353,7 @@ describe("Schema wrapper", () => {
   });
 
   it("isValid reflects conformance", () => {
-    assert.equal(schema.isValid({ name: "Elf" }), true);
+    assert.equal(schema.isValid({ name: "Goblin" }), true);
     assert.equal(schema.isValid({ name: 1 }), false);
   });
 

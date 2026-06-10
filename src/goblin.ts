@@ -1,19 +1,19 @@
 /**
- * Elf — one node in the hierarchy. It owns the set of components from
- * DesignDocs/Components.md and wires them together; everything an elf can do is
+ * Goblin — one node in the hierarchy. It owns the set of components from
+ * DesignDocs/Components.md and wires them together; everything an goblin can do is
  * some composition of these managers:
  *
  *   - FunctionManager — its library of micro-functions, grouped into interfaces
  *   - PeerManager     — the edges in/out, and who may call what
- *   - SpawnManager    — forks child elves and registers them as peers
+ *   - SpawnManager    — forks child goblins and registers them as peers
  *   - PortsManager    — opens HTTP ports, each exposed as just another peer
  *   - Database        — a private KV store for whatever data it needs
  *   - NotesManager    — a persistent scratchpad (purpose / tasks / memory)
  *   - Agent           — the LLM "brain" driving it all
  *
- * Persistence is per-manager: each mirrors its state to the elf's work dir, so
- * `run()` restores the full elf (functions, interfaces, peer bindings, ports,
- * notes) and brings child elves + ports back up where they left off.
+ * Persistence is per-manager: each mirrors its state to the goblin's work dir, so
+ * `run()` restores the full goblin (functions, interfaces, peer bindings, ports,
+ * notes) and brings child goblins + ports back up where they left off.
  */
 
 import { mkdir, readFile } from "node:fs/promises";
@@ -33,7 +33,7 @@ import {
 import { Agent } from "./agent/agent.js";
 import { Logger } from "./utils/logger.js";
 import { runCli } from "./cli.js";
-import { ELF_SYSTEM_PROMPT, ROOT_PURPOSE } from "./elf_prompt.js";
+import { GOBLIN_SYSTEM_PROMPT, ROOT_PURPOSE } from "./goblin_prompt.js";
 
 import { Database } from "./database/database.js";
 import { databaseTools } from "./database/tools.js";
@@ -51,7 +51,7 @@ import { spawnManagerTools } from "./spawn/tools.js";
 import { spawnScript } from "./utils/spawn.js";
 
 
-// The peer name an elf gives the IPC edge back to whoever forked it.
+// The peer name an goblin gives the IPC edge back to whoever forked it.
 const PARENT_PEER = "parent";
 
 function spawnInspector(rootDir: string): void {
@@ -60,15 +60,15 @@ function spawnInspector(rootDir: string): void {
   process.on("exit", () => child.kill());
 }
 
-export type ElfId = string;
+export type GoblinId = string;
 
-export interface ElfConfig {
+export interface GoblinConfig {
   rootDir: string;
   openaiApiKey?: string;
   anthropicApiKey?: string;
 }
 
-export const ElfConfigSchema = new Schema<ElfConfig>({
+export const GoblinConfigSchema = new Schema<GoblinConfig>({
   type: "object",
   properties: {
     rootDir: { type: "string" },
@@ -77,10 +77,10 @@ export const ElfConfigSchema = new Schema<ElfConfig>({
   },
 });
 
-export class Elf {
-  // All set in `run()`, before the first await — the elf is unusable until then.
-  private config!: ElfConfig;
-  private elfDir!: string;
+export class Goblin {
+  // All set in `run()`, before the first await — the goblin is unusable until then.
+  private config!: GoblinConfig;
+  private goblinDir!: string;
   private agent!: Agent;
   private functionManager!: FunctionManager;
   private peerManager!: PeerManager;
@@ -90,12 +90,12 @@ export class Elf {
   private notesManager!: NotesManager;
 
   /**
-   * Entry point for the top-of-tree elf: read config, ensure the root work dir,
-   * then run the elf alongside a stdin REPL that feeds the user's lines to its
+   * Entry point for the top-of-tree goblin: read config, ensure the root work dir,
+   * then run the goblin alongside a stdin REPL that feeds the user's lines to its
    * agent.
    */
-  async runRootElf() {
-    console.log(`Launching root elf`);
+  async runRootGoblin() {
+    console.log(`Launching root goblin`);
 
     const config = await this.readConfigFile();
     console.log(`Loaded config...`);
@@ -103,7 +103,7 @@ export class Elf {
     await this.createWorkDir(config.rootDir);
 
     // The inspector server exposes an admin port that serves a
-    // web UI for inspecting the elf's state and activity.
+    // web UI for inspecting the goblin's state and activity.
     spawnInspector(config.rootDir);
 
     await Promise.all([
@@ -115,32 +115,32 @@ export class Elf {
   }
 
   /**
-   * Boot this elf in `elfDir`: construct and start every component, reconnect to
-   * the parent (if forked), restore child elves + ports, then run the agent loop.
+   * Boot this goblin in `goblinDir`: construct and start every component, reconnect to
+   * the parent (if forked), restore child goblins + ports, then run the agent loop.
    * If `purpose` is provided and no Purpose note exists yet, it is written now.
    */
-  async run(config: ElfConfig, elfDir: string, purpose?: string) {
-    console.log(`Running an elf in ${elfDir}!`);
-    process.chdir(elfDir);
+  async run(config: GoblinConfig, goblinDir: string, purpose?: string) {
+    console.log(`Running an goblin in ${goblinDir}!`);
+    process.chdir(goblinDir);
     this.config = config;
-    this.elfDir = elfDir;
-    Logger.init(elfDir);
-    Logger.logEvent("[elf] started");
+    this.goblinDir = goblinDir;
+    Logger.init(goblinDir);
+    Logger.logEvent("[goblin] started");
 
     // Construct all managers synchronously first (no awaits), then build the
     // agent with tools that close over them. Everything is still set before the
     // first await, so a racing CLI or peer message can't find an unset field.
-    this.functionManager = new FunctionManager(elfDir);
-    this.peerManager = new PeerManager(elfDir, this.functionManager);
-    this.database = new Database(elfDir);
-    this.notesManager = new NotesManager(elfDir);
+    this.functionManager = new FunctionManager(goblinDir);
+    this.peerManager = new PeerManager(goblinDir, this.functionManager);
+    this.database = new Database(goblinDir);
+    this.notesManager = new NotesManager(goblinDir);
     this.spawnManager = new SpawnManager({
-      childrenDir: path.join(elfDir, "children"),
+      childrenDir: path.join(goblinDir, "children"),
       importMetaUrl: import.meta.url,
       peerManager: this.peerManager,
-      initPayload: (childDir, purpose) => ({ config, elfDir: childDir, purpose }),
+      initPayload: (childDir, purpose) => ({ config, goblinDir: childDir, purpose }),
     });
-    this.portsManager = new PortsManager(elfDir, this.peerManager, this.functionManager);
+    this.portsManager = new PortsManager(goblinDir, this.peerManager, this.functionManager);
 
     this.agent = Agent.createAgent(config, [
       ...functionManagerTools(this.functionManager),
@@ -149,7 +149,7 @@ export class Elf {
       ...peerManagerTools(this.peerManager),
       ...portsManagerTools(this.portsManager),
       ...spawnManagerTools(this.spawnManager),
-    ], ELF_SYSTEM_PROMPT);
+    ], GOBLIN_SYSTEM_PROMPT);
 
     // Restore persisted state. FunctionManager first so the interface bindings
     // PeerManager loads resolve against functions that already exist.
@@ -161,7 +161,7 @@ export class Elf {
       await this.notesManager.setNote("Purpose", purpose);
     }
     const purposeNote = this.notesManager.getNote("Purpose");
-    if (purposeNote) Logger.logEvent(`[elf] purpose: ${purposeNote.split("\n")[0].trim()}`);
+    if (purposeNote) Logger.logEvent(`[goblin] purpose: ${purposeNote.split("\n")[0].trim()}`);
     await this.portsManager.start();
     this.registerSyscalls();
 
@@ -289,15 +289,15 @@ export class Elf {
 
   /**
    * Ensure the work directory at `dirPath` exists. No-op if already present.
-   * (Child work dirs are created by SpawnManager; this is for the root elf.)
+   * (Child work dirs are created by SpawnManager; this is for the root goblin.)
    */
   async createWorkDir(dirPath: string): Promise<void> {
     await mkdir(dirPath, { recursive: true });
   }
 
-  private async readConfigFile(): Promise<ElfConfig> {
+  private async readConfigFile(): Promise<GoblinConfig> {
     const configPath = path.join(process.cwd(), "config.json");
     const raw = await readFile(configPath, "utf8");
-    return ElfConfigSchema.parse(JSON.parse(raw));
+    return GoblinConfigSchema.parse(JSON.parse(raw));
   }
 }

@@ -1,6 +1,6 @@
 /**
  * Agent tool-calls for FunctionManager — lets the LLM brain create, inspect,
- * modify, and execute the elf's functions, interfaces, and shared libs.
+ * modify, and execute the goblin's functions, interfaces, and shared libs.
  *
  * Each tool wraps one FunctionManager operation. Errors are caught and returned
  * as strings so the agent can read what went wrong and self-correct rather than
@@ -380,7 +380,7 @@ function syscallTools(fm: FunctionManager): Tool[] {
       name: "list_syscalls",
       description:
         "List all system calls available to functions at runtime. Each syscall is a " +
-        "host-provided capability registered by the elf's main script. " +
+        "host-provided capability registered by the goblin's main script. " +
         "To call one from function code: `const result = await sys.call(name, input)` — " +
         "`sys` is available at module scope without any import.",
       parameters: { type: "object", properties: {} },

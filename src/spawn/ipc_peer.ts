@@ -1,7 +1,7 @@
 /**
  * An {@link AbstractPeer} over a Node IPC channel — a forked child process, or
  * `process` itself for talking to our parent. This is the only transport for
- * V1, since the elf hierarchy is a process tree wired together by `fork()`.
+ * V1, since the goblin hierarchy is a process tree wired together by `fork()`.
  *
  * Request/response correlation for this single edge is delegated to an
  * {@link AsyncRequestTracker}: each outgoing call gets a unique id, the matching

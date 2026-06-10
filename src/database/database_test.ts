@@ -11,7 +11,7 @@ describe("Database", () => {
   let db: Database;
 
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "elf-db-"));
+    dir = await mkdtemp(path.join(tmpdir(), "goblin-db-"));
     db = new Database(dir);
     await db.start();
   });
@@ -99,7 +99,7 @@ describe("Database", () => {
 
 describe("Database persistence", () => {
   it("reads back values written by a prior instance (disk is source of truth)", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "elf-db-persist-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "goblin-db-persist-"));
     try {
       const first = new Database(dir);
       await first.start();

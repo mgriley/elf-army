@@ -1,5 +1,5 @@
 /**
- * NotesManager — an elf's persistent, human-readable scratchpad.
+ * NotesManager — an goblin's persistent, human-readable scratchpad.
  *
  * The AI "brain" needs somewhere to record durable notes it can re-read on
  * startup to remember its purpose, ongoing tasks, and accumulated memory. Each
@@ -7,7 +7,7 @@
  * clever — it's deliberately the simplest manager in the system.
  *
  * Persistence follows the same shape as FunctionManager: the in-memory map is
- * the source of truth at runtime, and every change is mirrored to disk so an elf
+ * the source of truth at runtime, and every change is mirrored to disk so an goblin
  * restores all of its notes on restart. Here the note's content *is* its file,
  * so there's no separate manifest — one file per note is enough:
  *   notes/<name>.md

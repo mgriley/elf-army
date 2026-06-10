@@ -1,5 +1,5 @@
 /**
- * PeerManager — the edges in/out of this elf, and who may call what.
+ * PeerManager — the edges in/out of this goblin, and who may call what.
  *
  * Each peer is assigned at most one interface (a named group of functions; see
  * FunctionManager). A peer may call only the functions in its assigned
@@ -10,7 +10,7 @@
  *     Inherently runtime-only; you can't serialize a forked process. Attached
  *     when something brings the peer up (see SpawnManager) and dropped on exit.
  *   - the binding — `peerName -> interfaceName`. This is durable *intent*: the
- *     elf decided "child `auth` gets interface `db`", and that survives a
+ *     goblin decided "child `auth` gets interface `db`", and that survives a
  *     restart. Only this thin map is mirrored to `peers.json`.
  *
  * So a peer record can exist with no live connection (known-but-disconnected):
@@ -260,7 +260,7 @@ export class PeerManager {
     try {
       store = JSON.parse(await readFile(this.storePath, "utf8")) as PeerStore;
     } catch (err) {
-      if ((err as { code?: string }).code === "ENOENT") return; // fresh elf
+      if ((err as { code?: string }).code === "ENOENT") return; // fresh goblin
       throw err;
     }
     for (const [name, meta] of Object.entries(store.peers ?? {})) {

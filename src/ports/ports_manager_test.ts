@@ -15,7 +15,7 @@ describe("PortsManager", () => {
   let ports: PortsManager;
 
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "elf-ports-"));
+    dir = await mkdtemp(path.join(tmpdir(), "goblin-ports-"));
     fm = new FunctionManager(dir, { execTimeoutMs: 5000 });
     await fm.start();
     peers = new PeerManager(dir, fm);
@@ -43,7 +43,7 @@ describe("PortsManager", () => {
     await ports.openPort("public", { port: 0 });
     const res = await fetch(`http://127.0.0.1:${ports.getPort("public")}/`);
     assert.equal(res.status, 200);
-    assert.match(await res.text(), /Hello from ElfArmy/);
+    assert.match(await res.text(), /Hello from Goblin/);
   });
 
   it("routes full request details to the handler function", async () => {
@@ -108,7 +108,7 @@ describe("PortsManager", () => {
 
 describe("PortsManager persistence", () => {
   it("reopens persisted ports and restores their handler on restart", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "elf-ports-persist-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "goblin-ports-persist-"));
     try {
       // First run: open a port, close it (simulating shutdown).
       const fm1 = new FunctionManager(dir, { execTimeoutMs: 5000 });
@@ -134,7 +134,7 @@ describe("PortsManager persistence", () => {
       assert.equal(peers2.getPeerInterface("public"), "http_public");
       const res = await fetch(`http://127.0.0.1:${ports2.getPort("public")}/`);
       assert.equal(res.status, 200);
-      assert.match(await res.text(), /Hello from ElfArmy/);
+      assert.match(await res.text(), /Hello from Goblin/);
 
       ports2.closePort("public");
       await fm2.stop();

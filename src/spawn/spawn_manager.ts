@@ -1,5 +1,5 @@
 /**
- * SpawnManager — spawns child elves as child processes and registers them
+ * SpawnManager — spawns child goblins as child processes and registers them
  * as peers with the PeerManager.
  *
  * In V1 the only peers are processes in our own tree: we talk to children we
@@ -26,7 +26,7 @@ import { IpcPeer } from "./ipc_peer.js";
 import { assertValidPeerName, type PeerManager } from "../peers/peer_manager.js";
 
 export interface SpawnManagerOptions {
-  /** Directory holding one subdir per child elf (its workspace). */
+  /** Directory holding one subdir per child goblin (its workspace). */
   childrenDir: string;
   /** `import.meta.url` of the calling module; used to resolve the child entry point. */
   importMetaUrl: string;
@@ -57,7 +57,7 @@ export class SpawnManager {
   }
 
   /**
-   * Create a new child elf: ensure its workspace dir (with a "Purpose" note)
+   * Create a new child goblin: ensure its workspace dir (with a "Purpose" note)
    * exists, then fork and connect it. The child's name is its directory name
    * and its peer name. Throws if a child with this name is already running.
    */

@@ -1,6 +1,6 @@
 /**
  * Agent tool-calls for Database — lets the LLM brain read, write, delete, and
- * list entries in the elf's private KV store.
+ * list entries in the goblin's private KV store.
  */
 
 import type { Tool } from "../agent/llm.js";

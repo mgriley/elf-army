@@ -38,7 +38,7 @@ export interface ExecOptions {
   timeoutMs?: number;
 }
 
-/** The host-side interface passed to executors so worker code can call back into the elf. */
+/** The host-side interface passed to executors so worker code can call back into the goblin. */
 export interface SystemInterface {
   call(name: string, input: unknown): Promise<unknown>;
 }

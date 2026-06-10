@@ -1,5 +1,5 @@
 /**
- * The function-execution worker. One (eventually a small pool) runs per elf.
+ * The function-execution worker. One (eventually a small pool) runs per goblin.
  *
  * Deliberately plain JavaScript (`.mjs`), not TypeScript: it is spawned as a
  * worker thread and must load identically under tsx (dev) and from `dist`
@@ -9,7 +9,7 @@
  * defined (and type-checked on the main-thread side) in `worker_executor.ts`.
  *
  * Why a worker at all: it is its own realm, so user function code loaded here
- * can never block the elf's event loop or its IPC with parent/children. The
+ * can never block the goblin's event loop or its IPC with parent/children. The
  * realm is also the unit of unload — the only way to truly reclaim memory from
  * imported modules is to terminate this worker and respawn it (see
  * WorkerExecutor). Functions live as `.mjs` files on disk and are pulled in

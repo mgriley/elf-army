@@ -1,22 +1,22 @@
 import process from "node:process";
 
-import { Elf, type ElfConfig } from "./elf.js";
+import { Goblin, type GoblinConfig } from "./goblin.js";
 
-const elf = new Elf();
+const goblin = new Goblin();
 
 if (process.send) {
-  // We were forked by a parent elf — wait for its startup message.
-  const { config, elfDir, purpose } = await new Promise<{
-    config: ElfConfig;
-    elfDir: string;
+  // We were forked by a parent goblin — wait for its startup message.
+  const { config, goblinDir, purpose } = await new Promise<{
+    config: GoblinConfig;
+    goblinDir: string;
     purpose?: string;
   }>((resolve) => {
     process.once("message", (msg) =>
-      resolve(msg as { config: ElfConfig; elfDir: string; purpose?: string }),
+      resolve(msg as { config: GoblinConfig; goblinDir: string; purpose?: string }),
     );
   });
-  await elf.run(config, elfDir, purpose);
+  await goblin.run(config, goblinDir, purpose);
 } else {
   console.log(`Awakening the army...`);
-  await elf.runRootElf();
+  await goblin.runRootGoblin();
 }

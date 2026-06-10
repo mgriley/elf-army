@@ -1,0 +1,7 @@
+{
+  "peers": {
+    "main": {
+      "interface": "http_main"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 {
-  "name": "elf-army",
+  "name": "goblin",
   "version": "1.0.0",
-  "description": "Hierarchical autonomous runtime of Node.js subprocesses (elves) coordinated via IPC.",
+  "description": "Hierarchical autonomous runtime of Node.js subprocesses (goblins) coordinated via IPC.",
   "type": "module",
   "main": "dist/main.js",
   "scripts": {

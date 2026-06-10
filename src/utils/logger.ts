@@ -17,12 +17,12 @@ export class Logger {
   // Serialise all writes: each logEvent chains onto this promise.
   private queue: Promise<void> = Promise.resolve();
 
-  private constructor(elfDir: string) {
-    this.logPath = path.join(elfDir, LOG_FILE);
+  private constructor(goblinDir: string) {
+    this.logPath = path.join(goblinDir, LOG_FILE);
   }
 
-  static init(elfDir: string): void {
-    Logger.instance = new Logger(elfDir);
+  static init(goblinDir: string): void {
+    Logger.instance = new Logger(goblinDir);
   }
 
   static get(): Logger {

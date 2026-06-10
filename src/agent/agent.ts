@@ -1,5 +1,5 @@
 import { AsyncQueue } from "../utils/async-queue.js";
-import type { ElfConfig } from "../elf.js";
+import type { GoblinConfig } from "../goblin.js";
 import type { LLM, Message, Tool, ToolCall } from "./llm.js";
 import { AnthropicLLM } from "./anthropic-llm.js";
 import { OpenAILLM } from "./openai-llm.js";
@@ -25,10 +25,10 @@ export class Agent {
   }
 
   /**
-   * Build an Agent from an `ElfConfig`. Anthropic is preferred when both
+   * Build an Agent from an `GoblinConfig`. Anthropic is preferred when both
    * keys are present; throws if neither is set.
    */
-  static createAgent(config: ElfConfig, tools: Tool[] = [], systemPrompt?: string): Agent {
+  static createAgent(config: GoblinConfig, tools: Tool[] = [], systemPrompt?: string): Agent {
     if (config.anthropicApiKey) {
       return new Agent(
         new AnthropicLLM({ apiKey: config.anthropicApiKey }),
@@ -40,7 +40,7 @@ export class Agent {
       return new Agent(new OpenAILLM({ apiKey: config.openaiApiKey }), tools, systemPrompt);
     }
     throw new Error(
-      "Agent.createAgent: ElfConfig must include anthropicApiKey or openaiApiKey.",
+      "Agent.createAgent: GoblinConfig must include anthropicApiKey or openaiApiKey.",
     );
   }
 

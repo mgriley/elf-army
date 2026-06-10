@@ -1,6 +1,6 @@
 /**
  * An {@link AbstractPeer} over Node's built-in `http.Server` (zero deps) — the
- * edge that lets an elf act like a server.
+ * edge that lets an goblin act like a server.
  *
  * All inbound HTTP requests are forwarded to a single handler function (named at
  * construction time, typically `handleRequest_<portName>`). The function receives

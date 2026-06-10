@@ -69,7 +69,7 @@ GetPeers(name)
 
 ### Persisting peers
 
-In this case, a peer is a sub-process of the elf proc, so it can't be "persisted" in the same way as a file. I think simplest thing
+In this case, a peer is a sub-process of the goblin proc, so it can't be "persisted" in the same way as a file. I think simplest thing
 to do is for the PeerManager to track a peer's state (its name, interface, etc), then another component (like SpawnManager) is
 responsible for actually bringing up the peers on restart. When the peer connects again, its previous interface+options will apply.
 
@@ -139,11 +139,11 @@ Implemented in `src/notes/notes_manager.ts`. In-memory map is the source of trut
 
 
 ## PortsManager
-PortsManager opens listening ports so that an Elf can behave as a server. Currently, the only
+PortsManager opens listening ports so that an Goblin can behave as a server. Currently, the only
 supported protocol is HTTP. The PortsManager creates `HttpPeer` objects
 that register themselves as peers with the PeerManager. Each `HttpPeer` opens a
 listening port that, upon receiving an HTTP message, forwards it to PeerManager (like any other peer).
-Thus, having an Elf act like a server is just a matter of spawning an HttpPeer for it. From
+Thus, having an Goblin act like a server is just a matter of spawning an HttpPeer for it. From
 there, it reuses all the same mechanisms for functions+interfaces that any peer uses.
 
 The key idea: **an open port is just another kind of peer.** An inbound HTTP request is
@@ -206,7 +206,7 @@ workspace dir, PeerManager owns the interface".
 `host` defaults to loopback (`127.0.0.1`); binding `0.0.0.0` to face the network is an explicit
 choice. The assigned interface is the only authz boundary — there is no per-client auth in V1,
 so a port's interface should expose exactly what is safe for any caller that can reach it. If an
-Elf wishes to implement some form of user auth (like for user accounts), it can implement that
+Goblin wishes to implement some form of user auth (like for user accounts), it can implement that
 using normal functions, with shared libs and the database.
 
 
@@ -219,11 +219,11 @@ Also want it to be a self-contained program/concept that can be ported to other 
 
 ### Persistence
 
-An Elf's full state should be able to be restored when it restarts. That means that for each manager the various functions should persist
-the changes to disk. On startup, an Elf restores its full state.
+An Goblin's full state should be able to be restored when it restarts. That means that for each manager the various functions should persist
+the changes to disk. On startup, an Goblin restores its full state.
 
 ### Free-form messenging
 
-In the current design, an elf can only message its direct parent and direct children. This should be fine to start, but I suspect we
+In the current design, an goblin can only message its direct parent and direct children. This should be fine to start, but I suspect we
 may want some kind of slack-like messenging system later on. If a node is stuck, can send a message to a "General" channel, which triggers
 all nodes in the channel to respond to the message. Useful if multiple nodes need to agree on a plan for some impl detail.

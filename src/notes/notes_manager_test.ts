@@ -11,7 +11,7 @@ describe("NotesManager", () => {
   let nm: NotesManager;
 
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), "elf-notes-"));
+    dir = await mkdtemp(path.join(tmpdir(), "goblin-notes-"));
     nm = new NotesManager(dir);
     await nm.start();
   });
@@ -56,7 +56,7 @@ describe("NotesManager", () => {
 
 describe("NotesManager persistence", () => {
   it("restores notes across restarts", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "elf-notes-persist-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "goblin-notes-persist-"));
     try {
       const first = new NotesManager(dir);
       await first.start();
@@ -74,7 +74,7 @@ describe("NotesManager persistence", () => {
   });
 
   it("drops a deleted note on restart", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "elf-notes-persist-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "goblin-notes-persist-"));
     try {
       const first = new NotesManager(dir);
       await first.start();
