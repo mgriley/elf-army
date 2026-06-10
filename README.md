@@ -31,7 +31,7 @@ the code is updated in-place. The entire resolution might occur so fast that the
 
 ## Design
 
-When you run `goblin`, it starts a single root goblin. Each goblin is a `node` server that runs an agent loop and a worker thread for interpreting code.
+When you run `goblin`, it starts a single root goblin. Each goblin is a `node` process that runs an agent loop and a worker thread for interpreting code.
 
 At first, a goblin doesn't contain any business logic at all! Instead, each goblin comes with the essential tool-calls for writing its own scripts.
 
