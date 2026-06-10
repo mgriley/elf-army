@@ -24,7 +24,7 @@ that uses an embedded agent to write (and revise) the scripts that contain its b
 Essentially, a living system embeds its own development team, making it capable of rapid iteration and self-healing.
 
 Consider the typical bug resolution process: some code fails, a bug is reported, a programmer fixes it, then the fix is deployed.
-The end-user experiences the fix days to weeks later (if they're lucky).
+The end-user gets the fix days to weeks later (if they're lucky).
 
 With a living system, the fix is done locally and near-instantly. The interpreted code bubbles up an exception, the embedded agent fixes it, and
 the code is updated in-place. The entire resolution might occur so fast that the user's original web request can still be served.
