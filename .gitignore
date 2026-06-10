@@ -4,4 +4,4 @@ dist/
 *.log
 .DS_Store
 config.json
-elf-root
+goblin-root
