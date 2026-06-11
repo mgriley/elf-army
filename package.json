@@ -9,7 +9,8 @@
     "start": "node dist/main.js",
     "dev": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test $(find src -name '*_test.ts')"
+    "test": "node --import tsx --test $(find src -name '*_test.ts')",
+    "test:e2e": "node --import tsx tests/run.ts"
   },
   "keywords": [],
   "author": "",
